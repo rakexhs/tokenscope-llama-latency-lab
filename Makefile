@@ -144,14 +144,14 @@ report: ## Generate findings report (Markdown)
 
 analysis: plots report ## Full analysis pipeline (plots + report)
 
-# ── Full Pipelines ─────────────────────────────────────────────────────
-full-cpu: test bench-cpu sweep-seq decompose bandwidth-cpu plots report ## Full CPU pipeline (MODEL= optional)
+# ── Full Pipelines (all experiments) ───────────────────────────────────
+full-cpu: test bench-cpu sweep-seq sweep-models sweep-precision decompose profiler bandwidth-cpu plots report ## Full CPU pipeline — all experiments
 	@echo "\n[TokenScope] Full CPU pipeline complete. See results/$${SYSTEM:-<system>}/report/report_latest.md"
 
-full-gpu: _require-model test bench-gpu sweep-seq-gpu decompose-gpu bandwidth-gpu energy plots report ## Full GPU pipeline (requires MODEL=)
+full-gpu: _require-model test bench-gpu sweep-seq-gpu sweep-models sweep-precision sweep-kv decompose-gpu profiler bandwidth-gpu energy plots report ## Full GPU pipeline — all experiments (requires MODEL=)
 	@echo "\n[TokenScope] Full GPU pipeline complete. See results/$${SYSTEM:-<system>}/report/report_latest.md"
 
-full-mps: test bench-mps sweep-seq decompose bandwidth-cpu plots report ## Full MPS pipeline (MODEL= optional)
+full-mps: test bench-mps sweep-seq sweep-models sweep-precision decompose profiler bandwidth-cpu plots report ## Full MPS pipeline — all experiments
 	@echo "\n[TokenScope] Full MPS pipeline complete. See results/$${SYSTEM:-<system>}/report/report_latest.md"
 
 # ── Cleanup ────────────────────────────────────────────────────────────

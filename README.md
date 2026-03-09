@@ -146,7 +146,11 @@ make full-mps SYSTEM=My_Machine MODEL=/path/to/llama-3b.gguf
 make full-gpu SYSTEM=My_Machine MODEL=/path/to/model.gguf
 ```
 
-Each full pipeline runs: **test → benchmark → sweep → decompose → bandwidth → plots → report**.
+Each full pipeline runs **every experiment type**:
+
+**test → benchmark → sequence sweep → model sweep → precision sweep → decompose → profiler → bandwidth → plots → report**
+
+`full-gpu` additionally runs: **KV-cache quantization sweep + energy estimation**.
 
 Your findings report will be at: `results/My_Machine/report/report_latest.md`
 
