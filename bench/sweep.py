@@ -7,6 +7,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import copy
 import itertools
 import sys
 from pathlib import Path
@@ -18,18 +19,32 @@ from bench.run_bench import load_config, run_benchmark
 from bench.utils.system_name import resolve_results_dir
 
 
-def expand_sweep(sweep_config: dict[str, Any]) -> list[dict[str, Any]]:
+def expand_sweep(
+    sweep_config: dict[str, Any],
+    cli_overrides: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Expand a sweep config into a list of individual run configs.
 
     The sweep config has a 'base' section (merged with defaults) and a
     'sweep' section mapping dot-paths to lists of values.  The Cartesian
     product of all sweep dimensions is computed.
+
+    ``cli_overrides`` (e.g. ``["model.id_or_path=/tmp/m.gguf"]``) are
+    applied to the base config *before* sweep expansion, so they act as
+    a blanket override across every generated combination.
     """
+    from bench.run_bench import _apply_dot_overrides, _deep_merge
+    from bench.methodology import DEFAULT_CONFIG
+
     base = sweep_config.get("base", {})
     sweep_axes = sweep_config.get("sweep", {})
 
+    merged_base = _deep_merge(DEFAULT_CONFIG, base)
+    if cli_overrides:
+        merged_base = _apply_dot_overrides(merged_base, cli_overrides)
+
     if not sweep_axes:
-        return [base]
+        return [merged_base]
 
     keys = list(sweep_axes.keys())
     value_lists = [sweep_axes[k] for k in keys]
@@ -37,12 +52,7 @@ def expand_sweep(sweep_config: dict[str, Any]) -> list[dict[str, Any]]:
     configs: list[dict[str, Any]] = []
     for combo in itertools.product(*value_lists):
         overrides = [f"{k}={v}" for k, v in zip(keys, combo)]
-        # Load from a dummy base to get defaults, then apply overrides
-        from bench.run_bench import _apply_dot_overrides, _deep_merge
-        from bench.methodology import DEFAULT_CONFIG
-
-        merged = _deep_merge(DEFAULT_CONFIG, base)
-        merged = _apply_dot_overrides(merged, overrides)
+        merged = _apply_dot_overrides(copy.deepcopy(merged_base), overrides)
         configs.append(merged)
 
     return configs
@@ -52,12 +62,13 @@ def run_sweep(
     config_path: str,
     results_dir: str = "results",
     system_name: str = "",
+    cli_overrides: list[str] | None = None,
 ) -> list[dict[str, str]]:
     """Run all configs in a sweep and return list of output paths."""
     with open(config_path) as f:
         sweep_config = yaml.safe_load(f) or {}
 
-    configs = expand_sweep(sweep_config)
+    configs = expand_sweep(sweep_config, cli_overrides=cli_overrides)
     total = len(configs)
     print(f"[TokenScope Sweep] {total} configuration(s) to run from {config_path}")
     print(f"  System: {system_name}")
@@ -87,6 +98,10 @@ def main() -> None:
         "--system", type=str, default=None,
         help="System name for organizing results (prompted if not provided)",
     )
+    parser.add_argument(
+        "--override", nargs="*", default=[],
+        help="Override base config values (e.g. model.id_or_path=/path/to/model.gguf)",
+    )
     args = parser.parse_args()
 
     if not Path(args.config).exists():
@@ -94,7 +109,11 @@ def main() -> None:
         sys.exit(1)
 
     results_dir, system_name = resolve_results_dir(args.results_dir, cli_system=args.system)
-    run_sweep(args.config, results_dir, system_name=system_name)
+    run_sweep(
+        args.config, results_dir,
+        system_name=system_name,
+        cli_overrides=args.override or None,
+    )
 
 
 if __name__ == "__main__":

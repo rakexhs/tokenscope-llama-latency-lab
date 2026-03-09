@@ -78,7 +78,7 @@ make install
 make test
 ```
 
-All 37 tests should pass. No model weights are needed.
+All tests should pass. No model weights are needed.
 
 ---
 
@@ -119,19 +119,24 @@ make systems
 Pick the one that matches your hardware:
 
 ```bash
-# CPU-only machine
+# CPU-only machine (no GPU or GGUF needed)
 make full-cpu SYSTEM=My_Machine
 
-# NVIDIA GPU machine (needs MODEL= for GPU bench)
+# NVIDIA GPU machine (requires a GGUF model file)
 make full-gpu SYSTEM=My_Machine MODEL=/path/to/model.gguf
 
 # Apple Silicon Mac
 make full-mps SYSTEM=My_Machine
 ```
 
-Each `full-*` target runs: **test → benchmark → sweep → decompose → bandwidth → plots → report**.
+Each full pipeline runs: **test → benchmark → sweep → decompose → bandwidth → plots → report**.
+
+- `full-cpu` and `full-mps` use `sshleifer/tiny-gpt2` (auto-downloaded, ~500 KB).
+- `full-gpu` uses your GGUF model for benchmarks and sweeps, plus `tiny-gpt2` for HF decomposition.
 
 Your findings report will be at: `results/My_Machine/report/report_latest.md`
+
+> **Note:** `full-gpu` requires `MODEL=`. If you forget it, you'll get a clear error message.
 
 ---
 
@@ -144,28 +149,31 @@ Always pass `SYSTEM=Your_Machine_Name` to keep results organized.
 
 | Command | What it does |
 |---|---|
-| `make bench-cpu SYSTEM=X` | Run CPU benchmark with tiny-gpt2 (works everywhere) |
-| `make bench-gpu SYSTEM=X MODEL=/path/to/model.gguf` | Run GPU benchmark with a GGUF model via llama.cpp |
-| `make bench-mps SYSTEM=X` | Run Apple Silicon MPS benchmark with tiny-gpt2 |
+| `make bench-cpu SYSTEM=X` | CPU benchmark with tiny-gpt2 (works everywhere) |
+| `make bench-gpu SYSTEM=X MODEL=/path/to.gguf` | GPU benchmark with a GGUF model via llama.cpp |
+| `make bench-mps SYSTEM=X` | Apple Silicon MPS benchmark with tiny-gpt2 |
 
 ### Sweeps
 
 | Command | What it does |
 |---|---|
-| `make sweep-seq SYSTEM=X` | Sequence-length sweep (latency vs. context length) |
-| `make sweep-models SYSTEM=X` | Model-size sweep (compare different models) |
+| `make sweep-seq SYSTEM=X` | Sequence-length sweep (CPU, tiny-gpt2) |
+| `make sweep-seq-gpu SYSTEM=X MODEL=/path/to.gguf` | Sequence-length sweep on GPU (llama.cpp) |
+| `make sweep-models SYSTEM=X` | Model-size sweep |
 | `make sweep-precision SYSTEM=X` | Precision sweep (fp32 vs. fp16/bf16) |
-| `make sweep-kv SYSTEM=X` | KV-cache quantization sweep (f16 vs. q8_0 vs. q4_0) |
+| `make sweep-kv SYSTEM=X MODEL=/path/to.gguf` | KV-cache quantization sweep (f16/q8_0/q4_0) |
 
 ### Profiling
 
 | Command | What it does |
 |---|---|
-| `make decompose SYSTEM=X` | Latency decomposition on CPU |
-| `make decompose-gpu SYSTEM=X` | Latency decomposition on CUDA GPU |
+| `make decompose SYSTEM=X` | Latency decomposition on CPU (tiny-gpt2) |
+| `make decompose-gpu SYSTEM=X` | Latency decomposition on CUDA GPU (tiny-gpt2, HF) |
 | `make profiler SYSTEM=X` | torch.profiler operator-level analysis |
-| `make bandwidth SYSTEM=X` | Memory bandwidth micro-benchmark |
-| `make energy SYSTEM=X` | Energy-per-token estimation (NVIDIA GPU only, safe skip otherwise) |
+| `make bandwidth-cpu SYSTEM=X` | Memory bandwidth micro-benchmark (CPU) |
+| `make bandwidth-gpu SYSTEM=X` | Memory bandwidth micro-benchmark (CUDA) |
+| `make bandwidth-mps SYSTEM=X` | Memory bandwidth micro-benchmark (MPS fallback) |
+| `make energy SYSTEM=X` | Energy-per-token estimation (NVIDIA only, safe skip) |
 
 ### Analysis & Reporting
 
@@ -207,7 +215,7 @@ make test
 make bench-cpu SYSTEM=My_CPU_Machine
 make sweep-seq SYSTEM=My_CPU_Machine
 make decompose SYSTEM=My_CPU_Machine
-make bandwidth SYSTEM=My_CPU_Machine
+make bandwidth-cpu SYSTEM=My_CPU_Machine
 make plots SYSTEM=My_CPU_Machine
 make report SYSTEM=My_CPU_Machine
 ```
@@ -220,12 +228,18 @@ cd tokenscope-llama-latency-lab
 python3 -m venv .venv
 source .venv/bin/activate
 make install
+make full-gpu SYSTEM=RTX4090_Lab MODEL=/path/to/llama-2-7b-q4_k_m.gguf
+```
+
+Or step by step:
+
+```bash
 make test
 make bench-gpu SYSTEM=RTX4090_Lab MODEL=/path/to/llama-2-7b-q4_k_m.gguf
-make sweep-seq SYSTEM=RTX4090_Lab
-make sweep-kv SYSTEM=RTX4090_Lab
+make sweep-seq-gpu SYSTEM=RTX4090_Lab MODEL=/path/to/llama-2-7b-q4_k_m.gguf
+make sweep-kv SYSTEM=RTX4090_Lab MODEL=/path/to/llama-2-7b-q4_k_m.gguf
 make decompose-gpu SYSTEM=RTX4090_Lab
-make bandwidth SYSTEM=RTX4090_Lab
+make bandwidth-gpu SYSTEM=RTX4090_Lab
 make energy SYSTEM=RTX4090_Lab
 make plots SYSTEM=RTX4090_Lab
 make report SYSTEM=RTX4090_Lab
@@ -250,7 +264,7 @@ make bench-mps SYSTEM=MacBook_Pro_M3
 make bench-cpu SYSTEM=MacBook_Pro_M3
 make sweep-seq SYSTEM=MacBook_Pro_M3
 make decompose SYSTEM=MacBook_Pro_M3
-make bandwidth SYSTEM=MacBook_Pro_M3
+make bandwidth-cpu SYSTEM=MacBook_Pro_M3
 make plots SYSTEM=MacBook_Pro_M3
 make report SYSTEM=MacBook_Pro_M3
 ```
@@ -270,14 +284,13 @@ make bench-gpu SYSTEM=My_Machine MODEL=/path/to/llama-2-7b-q4_k_m.gguf
 
 ### KV-Cache Quantization Experiments (requires GGUF)
 
+Pass the model path directly via `MODEL=` — no need to edit YAML files:
+
 ```bash
-make sweep-kv SYSTEM=My_Machine
+make sweep-kv SYSTEM=My_Machine MODEL=/path/to/llama-2-7b-q4_k_m.gguf
 make plots SYSTEM=My_Machine
 make report SYSTEM=My_Machine
 ```
-
-> **Note:** Edit `configs/sweep_kv_cache.yaml` to set `model.id_or_path` to your GGUF path,
-> or pass it as an override when calling `python -m bench.sweep` directly.
 
 ### HuggingFace Models (requires access approval + GPU RAM)
 
@@ -315,7 +328,7 @@ After running benchmarks and analysis for a system named `My_Laptop`:
 tokenscope-llama-latency-lab/
 ├── bench/                      # Benchmark harness
 │   ├── run_bench.py            #   Main benchmark CLI
-│   ├── sweep.py                #   Sweep runner
+│   ├── sweep.py                #   Sweep runner (supports --override)
 │   ├── methodology.py          #   Methodology constants
 │   ├── registry.py             #   Run ID, config hash, manifests
 │   ├── results_schema.py       #   Result dataclasses
@@ -350,6 +363,13 @@ tokenscope-llama-latency-lab/
 │   ├── report_tables.py        #   Markdown tables
 │   └── findings_report.py      #   Auto-generated report
 ├── configs/                    # YAML experiment configs
+│   ├── bench_default.yaml
+│   ├── sweep_sequence.yaml     #   CPU sequence sweep
+│   ├── sweep_sequence_gpu.yaml #   GPU sequence sweep (llama.cpp)
+│   ├── sweep_models.yaml
+│   ├── sweep_precision.yaml
+│   ├── sweep_kv_cache.yaml
+│   └── devices_example.yaml
 ├── docs/                       # Documentation
 ├── results/                    # Output (per-system subdirectories)
 ├── tests/                      # Pytest suite
@@ -367,7 +387,7 @@ tokenscope-llama-latency-lab/
 | **2** | Latency decomposition | `make decompose SYSTEM=X` |
 | **3** | Scaling + inflections | `make sweep-seq SYSTEM=X` |
 | **4** | Bottleneck reasoning | `make plots SYSTEM=X` (roofline + regime analysis) |
-| **5** | KV-cache quantization | `make sweep-kv SYSTEM=X` |
+| **5** | KV-cache quantization | `make sweep-kv SYSTEM=X MODEL=...` |
 | **Bonus** | Cross-platform | Run on multiple machines with different `SYSTEM=` |
 | **Bonus** | Energy estimation | `make energy SYSTEM=X` |
 | **Bonus** | TTFT optimization | See `docs/architecture_notes.md` |
@@ -393,6 +413,7 @@ full experiment design and architectural interpretation.
 
 | Problem | Solution |
 |---|---|
+| `MODEL is required` error | GPU/GGUF targets need `MODEL=/path/to/file.gguf` |
 | `ModuleNotFoundError: No module named 'torch'` | Run `make install-cpu` or install PyTorch from [pytorch.org](https://pytorch.org) |
 | `ModuleNotFoundError: No module named 'llama_cpp'` | Run `make install` (includes llama-cpp-python) |
 | `error: externally-managed-environment` | Create a virtual environment first (see Setup section) |
