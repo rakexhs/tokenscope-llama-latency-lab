@@ -15,6 +15,7 @@ from typing import Any
 import yaml
 
 from bench.run_bench import load_config, run_benchmark
+from bench.utils.system_name import resolve_results_dir
 
 
 def expand_sweep(sweep_config: dict[str, Any]) -> list[dict[str, Any]]:
@@ -50,6 +51,7 @@ def expand_sweep(sweep_config: dict[str, Any]) -> list[dict[str, Any]]:
 def run_sweep(
     config_path: str,
     results_dir: str = "results",
+    system_name: str = "",
 ) -> list[dict[str, str]]:
     """Run all configs in a sweep and return list of output paths."""
     with open(config_path) as f:
@@ -58,6 +60,7 @@ def run_sweep(
     configs = expand_sweep(sweep_config)
     total = len(configs)
     print(f"[TokenScope Sweep] {total} configuration(s) to run from {config_path}")
+    print(f"  System: {system_name}")
 
     all_paths: list[dict[str, str]] = []
     for i, cfg in enumerate(configs, 1):
@@ -65,7 +68,7 @@ def run_sweep(
         print(f"[Sweep {i}/{total}]")
         print(f"{'='*60}")
         try:
-            paths = run_benchmark(cfg, results_dir)
+            paths = run_benchmark(cfg, results_dir, system_name=system_name)
             all_paths.append(paths)
         except Exception as e:
             print(f"[WARN] Sweep config {i} failed: {e}")
@@ -79,14 +82,19 @@ def run_sweep(
 def main() -> None:
     parser = argparse.ArgumentParser(description="TokenScope sweep runner")
     parser.add_argument("--config", type=str, required=True, help="Path to sweep YAML config")
-    parser.add_argument("--results_dir", type=str, default="results", help="Results directory")
+    parser.add_argument("--results_dir", type=str, default="results", help="Base results directory")
+    parser.add_argument(
+        "--system", type=str, default=None,
+        help="System name for organizing results (prompted if not provided)",
+    )
     args = parser.parse_args()
 
     if not Path(args.config).exists():
         print(f"Error: config file not found: {args.config}", file=sys.stderr)
         sys.exit(1)
 
-    run_sweep(args.config, args.results_dir)
+    results_dir, system_name = resolve_results_dir(args.results_dir, cli_system=args.system)
+    run_sweep(args.config, results_dir, system_name=system_name)
 
 
 if __name__ == "__main__":

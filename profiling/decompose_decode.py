@@ -173,7 +173,15 @@ def main() -> None:
     parser.add_argument("--n_tokens", type=int, default=16)
     parser.add_argument("--dtype", type=str, default="auto")
     parser.add_argument("--results_dir", type=str, default="results")
+    parser.add_argument(
+        "--system", type=str, default=None,
+        help="System name for organizing results (prompted if not provided)",
+    )
     args = parser.parse_args()
+
+    from bench.utils.system_name import resolve_results_dir
+
+    results_dir, _ = resolve_results_dir(args.results_dir, cli_system=args.system)
 
     decompose_decode(
         model_id=args.model,
@@ -181,7 +189,7 @@ def main() -> None:
         prompt_length=args.prompt_length,
         n_tokens=args.n_tokens,
         dtype=args.dtype,
-        results_dir=args.results_dir,
+        results_dir=results_dir,
     )
 
 

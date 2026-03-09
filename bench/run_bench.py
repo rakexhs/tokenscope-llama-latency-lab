@@ -21,6 +21,7 @@ from bench.registry import make_run_id, save_result
 from bench.results_schema import BenchmarkResult, RunConfig
 from bench.utils.env_info import capture_environment
 from bench.utils.prompts import make_prompt
+from bench.utils.system_name import resolve_results_dir
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -72,9 +73,14 @@ def load_config(config_path: str, overrides: list[str] | None = None) -> dict[st
     return config
 
 
-def run_benchmark(config: dict[str, Any], results_dir: str = "results") -> dict[str, str]:
+def run_benchmark(
+    config: dict[str, Any],
+    results_dir: str = "results",
+    system_name: str = "",
+) -> dict[str, str]:
     """Execute a full benchmark run and persist results."""
     env = capture_environment()
+    env.system_name = system_name
     run_id = make_run_id(config, env.git_sha)
 
     backend_name = config["backend"]
@@ -178,7 +184,12 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--config", type=str, required=True, help="Path to YAML config")
-    parser.add_argument("--results_dir", type=str, default="results", help="Results directory")
+    parser.add_argument("--results_dir", type=str, default="results", help="Base results directory")
+    parser.add_argument(
+        "--system", type=str, default=None,
+        help="System name for organizing results (e.g. MacBook_Pro_M3). "
+             "If not provided, you will be prompted interactively.",
+    )
     parser.add_argument(
         "--override", nargs="*", default=[], metavar="KEY=VALUE",
         help="key=value overrides (e.g. --override device=cuda model.id_or_path=foo)",
@@ -190,8 +201,9 @@ def main() -> None:
         print(f"Error: config file not found: {args.config}", file=sys.stderr)
         sys.exit(1)
 
+    results_dir, system_name = resolve_results_dir(args.results_dir, cli_system=args.system)
     config = load_config(args.config, args.override)
-    run_benchmark(config, args.results_dir)
+    run_benchmark(config, results_dir, system_name=system_name)
 
 
 if __name__ == "__main__":

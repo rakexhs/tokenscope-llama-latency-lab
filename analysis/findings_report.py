@@ -38,7 +38,7 @@ def _load_csv_safe(path: Path) -> list[dict[str, Any]]:
         return list(csv.DictReader(f))
 
 
-def generate_report(results_dir: str = "results") -> str:
+def generate_report(results_dir: str = "results", system_name: str = "") -> str:
     """Generate the full findings report as a markdown string."""
     rd = Path(results_dir)
     rows = load_aggregate_csv(results_dir)
@@ -56,7 +56,12 @@ def generate_report(results_dir: str = "results") -> str:
     sections: list[str] = []
 
     # Title
-    sections.append("# TokenScope Findings Report\n")
+    title = "# TokenScope Findings Report"
+    if system_name:
+        title += f" — {system_name}"
+    sections.append(title + "\n")
+    if system_name:
+        sections.append(f"**System:** `{system_name}`\n")
     sections.append(f"_Generated: {ts}_\n")
 
     # Executive Summary
@@ -267,9 +272,9 @@ def _extract_key_findings(
     return findings[:6]
 
 
-def write_report(results_dir: str = "results") -> str:
+def write_report(results_dir: str = "results", system_name: str = "") -> str:
     """Generate and write the findings report."""
-    report = generate_report(results_dir)
+    report = generate_report(results_dir, system_name=system_name)
 
     rd = Path(results_dir) / "report"
     rd.mkdir(parents=True, exist_ok=True)
@@ -289,8 +294,16 @@ def write_report(results_dir: str = "results") -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate findings report")
     parser.add_argument("--results_dir", type=str, default="results")
+    parser.add_argument(
+        "--system", type=str, default=None,
+        help="System name to generate report for (prompted if not provided)",
+    )
     args = parser.parse_args()
-    write_report(args.results_dir)
+
+    from bench.utils.system_name import resolve_results_dir
+
+    results_dir, system_name = resolve_results_dir(args.results_dir, cli_system=args.system)
+    write_report(results_dir, system_name=system_name)
 
 
 if __name__ == "__main__":

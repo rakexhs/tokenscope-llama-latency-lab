@@ -8,14 +8,15 @@ build/
 .eggs/
 
 
-# Results (keep structure, ignore data)
-results/raw/*.jsonl
-results/summary/*.csv
-results/summary/*.json
-results/figures/*.png
-results/figures/*.pdf
-results/report/*.md
-results/report/*.json
+# Results (keep top-level .gitkeep, ignore all generated data)
+results/**/raw/*.jsonl
+results/**/summary/*.csv
+results/**/summary/*.json
+results/**/summary/*.md
+results/**/figures/*.png
+results/**/figures/*.pdf
+results/**/report/*.md
+results/**/report/*.json
 !results/**/.gitkeep
 
 # Models

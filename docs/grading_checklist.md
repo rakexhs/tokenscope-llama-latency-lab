@@ -76,17 +76,22 @@ Maps each rubric requirement to the exact command to run and output files to ins
 # 1. Install
 pip install -e ".[hf,dev]"
 
-# 2. Run benchmarks
-make bench-cpu
-make sweep-seq
+# 2. Run benchmarks (pass SYSTEM= to identify this machine)
+make bench-cpu SYSTEM=My_Laptop
+make sweep-seq SYSTEM=My_Laptop
 
 # 3. Profiling
-make decompose
+make decompose SYSTEM=My_Laptop
 
-# 4. Analysis
-make plots
-make report
+# 4. Analysis (generates per-system plots and report)
+make plots SYSTEM=My_Laptop
+make report SYSTEM=My_Laptop
 
 # 5. Tests
 make test
+
+# 6. List all systems with results
+make systems
 ```
+
+All results are stored under `results/{system_name}/` for easy cross-platform comparison.

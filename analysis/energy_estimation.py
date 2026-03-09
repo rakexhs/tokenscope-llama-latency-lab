@@ -152,13 +152,21 @@ def plot_energy(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Energy-per-token estimation")
     parser.add_argument("--results_dir", type=str, default="results")
+    parser.add_argument(
+        "--system", type=str, default=None,
+        help="System name for organizing results (prompted if not provided)",
+    )
     args = parser.parse_args()
+
+    from bench.utils.system_name import resolve_results_dir
+
+    results_dir, _ = resolve_results_dir(args.results_dir, cli_system=args.system)
 
     result = estimate_energy_per_token()
     if result.get("available"):
         print(f"[Energy] Avg power: {result['avg_power_w']:.1f} W")
         print(f"[Energy] Joules/token: {result['joules_per_token']:.4f}")
-        save_energy_results([result], args.results_dir)
+        save_energy_results([result], results_dir)
     else:
         print(f"[Energy] {result.get('message', 'Not available.')}")
 

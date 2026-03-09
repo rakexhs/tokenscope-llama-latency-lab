@@ -22,16 +22,72 @@ TokenScope is an end-to-end performance forensics lab for autoregressive LLM inf
 pip install -e ".[hf,dev]"
 
 # Run benchmark with tiny model
+# You will be prompted: "Enter System Name:" — type a name for this machine
 python -m bench.run_bench \
   --config configs/bench_default.yaml \
+  --system My_Laptop \
   --override backend=hf device=cpu \
   model.id_or_path=sshleifer/tiny-gpt2 \
   generation.output_length=32 generation.prompt_length=64
 
-# Generate plots and report
-python -m analysis.make_plots --results_dir results
-python -m analysis.findings_report --results_dir results
+# Generate plots and report for that system
+python -m analysis.make_plots --system My_Laptop
+python -m analysis.findings_report --system My_Laptop
 ```
+
+## Multi-System Workflow
+
+Every command prompts for a **System Name** to keep each machine's results
+cleanly separated. Results are organized into per-system subdirectories:
+
+```
+results/
+├── MacBook_Pro_M3/          # Your laptop
+│   ├── raw/
+│   ├── summary/
+│   ├── figures/
+│   └── report/
+├── Lab_RTX4090/             # Lab workstation
+│   ├── raw/
+│   ├── summary/
+│   ├── figures/
+│   └── report/
+└── Server_A100/             # Cloud GPU
+    └── ...
+```
+
+### Three ways to set the system name
+
+1. **`--system` flag** (recommended for scripts):
+   ```bash
+   python -m bench.run_bench --config configs/bench_default.yaml --system Lab_RTX4090
+   ```
+
+2. **`TOKENSCOPE_SYSTEM` environment variable**:
+   ```bash
+   export TOKENSCOPE_SYSTEM=Lab_RTX4090
+   python -m bench.run_bench --config configs/bench_default.yaml
+   ```
+
+3. **Interactive prompt** (default if neither is set):
+   ```
+   Enter System Name: Lab_RTX4090
+   ```
+
+### Makefile shortcut
+
+```bash
+make bench-cpu SYSTEM=MacBook_Pro_M3
+make sweep-seq SYSTEM=MacBook_Pro_M3
+make plots SYSTEM=MacBook_Pro_M3
+make report SYSTEM=MacBook_Pro_M3
+
+# List all systems with saved results
+make systems
+```
+
+Each system gets its own aggregate CSV, figures, and findings report, making
+it straightforward to compare across machines in your survey/presentation.
 
 ## Repository Structure
 
@@ -120,6 +176,7 @@ See [`docs/grading_checklist.md`](docs/grading_checklist.md) for a complete mapp
 
 ```bash
 python -m bench.run_bench --config configs/bench_default.yaml \
+  --system My_Laptop \
   --override backend=hf device=cpu model.id_or_path=sshleifer/tiny-gpt2
 ```
 
@@ -129,6 +186,7 @@ python -m bench.run_bench --config configs/bench_default.yaml \
 pip install llama-cpp-python
 
 python -m bench.run_bench --config configs/bench_default.yaml \
+  --system Lab_RTX4090 \
   --override backend=llamacpp device=cpu \
   model.id_or_path=/path/to/llama-2-7b-q4_k_m.gguf
 ```
@@ -137,26 +195,26 @@ python -m bench.run_bench --config configs/bench_default.yaml \
 
 ```bash
 # Sequence length sweep
-python -m bench.sweep --config configs/sweep_sequence.yaml
+python -m bench.sweep --config configs/sweep_sequence.yaml --system My_Laptop
 
 # KV-cache quantization sweep (requires GGUF)
-python -m bench.sweep --config configs/sweep_kv_cache.yaml \
+python -m bench.sweep --config configs/sweep_kv_cache.yaml --system Lab_RTX4090 \
   --override model.id_or_path=/path/to/model.gguf
 ```
 
 ### Full Analysis Pipeline
 
 ```bash
-python -m analysis.make_plots --results_dir results
-python -m analysis.findings_report --results_dir results
-# Report: results/report/report_latest.md
+python -m analysis.make_plots --system My_Laptop
+python -m analysis.findings_report --system My_Laptop
+# Report: results/My_Laptop/report/report_latest.md
 ```
 
 ### Latency Decomposition
 
 ```bash
 python -m profiling.decompose_decode \
-  --model sshleifer/tiny-gpt2 --device cpu --n_tokens 16
+  --model sshleifer/tiny-gpt2 --device cpu --n_tokens 16 --system My_Laptop
 ```
 
 ## Optimization Summary: KV-Cache Quantization

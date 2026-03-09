@@ -51,10 +51,12 @@ def write_manifest(
     config: dict[str, Any],
     env: EnvironmentSnapshot,
     file_paths: dict[str, str],
+    system_name: str = "",
 ) -> Path:
     """Write a run manifest linking config, env, and output file paths."""
     manifest = {
         "run_id": run_id,
+        "system_name": system_name or env.system_name,
         "config_hash": config_hash(config),
         "config": config,
         "environment": asdict(env),
@@ -106,6 +108,7 @@ def save_result(
 
     row = {
         "run_id": run_id,
+        "system_name": result.env.system_name,
         "backend": result.config.backend,
         "device": result.config.device,
         "model_id": result.config.model_id,

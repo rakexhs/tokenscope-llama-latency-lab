@@ -111,14 +111,22 @@ def main() -> None:
     parser.add_argument("--prompt_length", type=int, default=64)
     parser.add_argument("--n_tokens", type=int, default=8)
     parser.add_argument("--results_dir", type=str, default="results")
+    parser.add_argument(
+        "--system", type=str, default=None,
+        help="System name for organizing results (prompted if not provided)",
+    )
     args = parser.parse_args()
+
+    from bench.utils.system_name import resolve_results_dir
+
+    results_dir, _ = resolve_results_dir(args.results_dir, cli_system=args.system)
 
     profile_decode(
         model_id=args.model,
         device=args.device,
         prompt_length=args.prompt_length,
         n_tokens=args.n_tokens,
-        results_dir=args.results_dir,
+        results_dir=results_dir,
     )
 
 

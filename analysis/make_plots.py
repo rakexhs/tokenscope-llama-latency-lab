@@ -313,9 +313,18 @@ def make_all_plots(results_dir: str = "results") -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate all analysis plots")
     parser.add_argument("--results_dir", type=str, default="results")
+    parser.add_argument(
+        "--system", type=str, default=None,
+        help="System name to generate plots for (prompted if not provided)",
+    )
     args = parser.parse_args()
 
-    make_all_plots(args.results_dir)
+    from bench.utils.system_name import resolve_results_dir
+
+    results_dir, system_name = resolve_results_dir(args.results_dir, cli_system=args.system)
+    print(f"[Plots] System: {system_name}")
+
+    make_all_plots(results_dir)
 
 
 if __name__ == "__main__":

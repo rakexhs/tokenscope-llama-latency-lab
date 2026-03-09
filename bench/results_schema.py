@@ -15,6 +15,7 @@ from typing import Any
 class EnvironmentSnapshot:
     """Machine / software environment captured at run time."""
 
+    system_name: str = ""
     os: str = ""
     python_version: str = ""
     cpu_model: str = ""
@@ -94,6 +95,7 @@ class SummaryRow:
     """Aggregated summary row for CSV output."""
 
     run_id: str = ""
+    system_name: str = ""
     backend: str = ""
     device: str = ""
     model_id: str = ""

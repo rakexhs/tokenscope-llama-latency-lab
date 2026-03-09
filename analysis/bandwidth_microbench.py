@@ -126,9 +126,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Memory bandwidth micro-benchmark")
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--results_dir", type=str, default="results")
+    parser.add_argument(
+        "--system", type=str, default=None,
+        help="System name for organizing results (prompted if not provided)",
+    )
     args = parser.parse_args()
 
-    run_bandwidth_suite([args.device], args.results_dir)
+    from bench.utils.system_name import resolve_results_dir
+
+    results_dir, _ = resolve_results_dir(args.results_dir, cli_system=args.system)
+    run_bandwidth_suite([args.device], results_dir)
 
 
 if __name__ == "__main__":
