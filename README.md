@@ -14,219 +14,373 @@ TokenScope is an end-to-end performance forensics lab for autoregressive LLM inf
 - **Architectural Modeling** — KV-cache sizing, bandwidth micro-benchmarks, roofline analysis, latency predictor fitting, and bottleneck regime classification
 - **KV-Cache Quantization** — Implemented optimization comparing f16/q8_0/q4_0 KV precision with speedup analysis
 - **Auto-Generated Report** — Publication-quality figures and a structured findings report from the latest results
+- **Multi-System Support** — Every command tags results by system name so you can benchmark across machines and compare side-by-side
 
-## Quick Start (CPU-only, ~2 minutes)
+---
+
+## Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| Python 3.10+ | Required |
+| git | Required |
+| pip | Required |
+| GPU PyTorch | Only for CUDA/MPS runs |
+| llama-cpp-python | Only for GGUF model runs |
+| make | Pre-installed on macOS/Linux; on Windows use WSL or `pip install make` |
+
+---
+
+## Setup on a New Machine
+
+### 1. Clone the repository
 
 ```bash
-# Install
-pip install -e ".[hf,dev]"
-
-# Run benchmark with tiny model
-# You will be prompted: "Enter System Name:" — type a name for this machine
-python -m bench.run_bench \
-  --config configs/bench_default.yaml \
-  --system My_Laptop \
-  --override backend=hf device=cpu \
-  model.id_or_path=sshleifer/tiny-gpt2 \
-  generation.output_length=32 generation.prompt_length=64
-
-# Generate plots and report for that system
-python -m analysis.make_plots --system My_Laptop
-python -m analysis.findings_report --system My_Laptop
+git clone https://github.com/rakexhs/tokenscope-llama-latency-lab.git
+cd tokenscope-llama-latency-lab
 ```
 
-## Multi-System Workflow
+### 2. Create a virtual environment
 
-Every command prompts for a **System Name** to keep each machine's results
-cleanly separated. Results are organized into per-system subdirectories:
+**macOS / Linux:**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+```
+
+**Windows (use WSL recommended):**
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install --upgrade pip
+```
+
+### 3. Install dependencies
+
+**CPU-only (works everywhere, no GPU needed):**
+
+```bash
+make install-cpu
+```
+
+**All backends (includes llama-cpp-python for GGUF models):**
+
+```bash
+make install
+```
+
+### 4. Verify installation
+
+```bash
+make test
+```
+
+All 37 tests should pass. No model weights are needed.
+
+---
+
+## System Name
+
+Every command uses `SYSTEM=` to tag which machine produced the results.
+This keeps each machine's data in its own folder under `results/`.
 
 ```
 results/
-├── MacBook_Pro_M3/          # Your laptop
-│   ├── raw/
-│   ├── summary/
-│   ├── figures/
-│   └── report/
-├── Lab_RTX4090/             # Lab workstation
-│   ├── raw/
-│   ├── summary/
-│   ├── figures/
-│   └── report/
-└── Server_A100/             # Cloud GPU
+├── MacBook_Pro_M3/        # Your laptop
+│   ├── raw/               # Per-run JSONL traces
+│   ├── summary/           # Aggregated CSVs
+│   ├── figures/           # PNG + PDF plots
+│   └── report/            # Findings reports + manifests
+├── Lab_RTX4090/           # Lab workstation
+│   └── ...
+└── Server_A100/           # Cloud GPU
     └── ...
 ```
 
-### Three ways to set the system name
+If you forget `SYSTEM=`, you will be prompted interactively:
 
-1. **`--system` flag** (recommended for scripts):
-   ```bash
-   python -m bench.run_bench --config configs/bench_default.yaml --system Lab_RTX4090
-   ```
+```
+Enter System Name: MacBook_Pro_M3
+```
 
-2. **`TOKENSCOPE_SYSTEM` environment variable**:
-   ```bash
-   export TOKENSCOPE_SYSTEM=Lab_RTX4090
-   python -m bench.run_bench --config configs/bench_default.yaml
-   ```
-
-3. **Interactive prompt** (default if neither is set):
-   ```
-   Enter System Name: Lab_RTX4090
-   ```
-
-### Makefile shortcut
+To see all systems with saved results:
 
 ```bash
-make bench-cpu SYSTEM=MacBook_Pro_M3
-make sweep-seq SYSTEM=MacBook_Pro_M3
-make plots SYSTEM=MacBook_Pro_M3
-make report SYSTEM=MacBook_Pro_M3
-
-# List all systems with saved results
 make systems
 ```
 
-Each system gets its own aggregate CSV, figures, and findings report, making
-it straightforward to compare across machines in your survey/presentation.
+---
+
+## Run Everything in One Command
+
+Pick the one that matches your hardware:
+
+```bash
+# CPU-only machine
+make full-cpu SYSTEM=My_Machine
+
+# NVIDIA GPU machine (needs MODEL= for GPU bench)
+make full-gpu SYSTEM=My_Machine MODEL=/path/to/model.gguf
+
+# Apple Silicon Mac
+make full-mps SYSTEM=My_Machine
+```
+
+Each `full-*` target runs: **test → benchmark → sweep → decompose → bandwidth → plots → report**.
+
+Your findings report will be at: `results/My_Machine/report/report_latest.md`
+
+---
+
+## Step-by-Step Commands
+
+If you prefer to run each step individually, here is every command.
+Always pass `SYSTEM=Your_Machine_Name` to keep results organized.
+
+### Benchmarks
+
+| Command | What it does |
+|---|---|
+| `make bench-cpu SYSTEM=X` | Run CPU benchmark with tiny-gpt2 (works everywhere) |
+| `make bench-gpu SYSTEM=X MODEL=/path/to/model.gguf` | Run GPU benchmark with a GGUF model via llama.cpp |
+| `make bench-mps SYSTEM=X` | Run Apple Silicon MPS benchmark with tiny-gpt2 |
+
+### Sweeps
+
+| Command | What it does |
+|---|---|
+| `make sweep-seq SYSTEM=X` | Sequence-length sweep (latency vs. context length) |
+| `make sweep-models SYSTEM=X` | Model-size sweep (compare different models) |
+| `make sweep-precision SYSTEM=X` | Precision sweep (fp32 vs. fp16/bf16) |
+| `make sweep-kv SYSTEM=X` | KV-cache quantization sweep (f16 vs. q8_0 vs. q4_0) |
+
+### Profiling
+
+| Command | What it does |
+|---|---|
+| `make decompose SYSTEM=X` | Latency decomposition on CPU |
+| `make decompose-gpu SYSTEM=X` | Latency decomposition on CUDA GPU |
+| `make profiler SYSTEM=X` | torch.profiler operator-level analysis |
+| `make bandwidth SYSTEM=X` | Memory bandwidth micro-benchmark |
+| `make energy SYSTEM=X` | Energy-per-token estimation (NVIDIA GPU only, safe skip otherwise) |
+
+### Analysis & Reporting
+
+| Command | What it does |
+|---|---|
+| `make plots SYSTEM=X` | Generate all figures (scaling, TTFT, throughput, KV cache, etc.) |
+| `make report SYSTEM=X` | Generate findings report (Markdown with embedded plots) |
+| `make analysis SYSTEM=X` | Both plots + report in one command |
+
+### Utilities
+
+| Command | What it does |
+|---|---|
+| `make test` | Run the test suite |
+| `make lint` | Run ruff linter on all source code |
+| `make systems` | List all systems with saved results |
+| `make clean` | Delete all generated results |
+| `make help` | Show all available commands |
+
+---
+
+## Platform-Specific Guides
+
+### CPU-Only Machine (any OS)
+
+```bash
+git clone https://github.com/rakexhs/tokenscope-llama-latency-lab.git
+cd tokenscope-llama-latency-lab
+python3 -m venv .venv
+source .venv/bin/activate
+make install-cpu
+make full-cpu SYSTEM=My_CPU_Machine
+```
+
+Or step by step:
+
+```bash
+make test
+make bench-cpu SYSTEM=My_CPU_Machine
+make sweep-seq SYSTEM=My_CPU_Machine
+make decompose SYSTEM=My_CPU_Machine
+make bandwidth SYSTEM=My_CPU_Machine
+make plots SYSTEM=My_CPU_Machine
+make report SYSTEM=My_CPU_Machine
+```
+
+### NVIDIA GPU Machine (CUDA)
+
+```bash
+git clone https://github.com/rakexhs/tokenscope-llama-latency-lab.git
+cd tokenscope-llama-latency-lab
+python3 -m venv .venv
+source .venv/bin/activate
+make install
+make test
+make bench-gpu SYSTEM=RTX4090_Lab MODEL=/path/to/llama-2-7b-q4_k_m.gguf
+make sweep-seq SYSTEM=RTX4090_Lab
+make sweep-kv SYSTEM=RTX4090_Lab
+make decompose-gpu SYSTEM=RTX4090_Lab
+make bandwidth SYSTEM=RTX4090_Lab
+make energy SYSTEM=RTX4090_Lab
+make plots SYSTEM=RTX4090_Lab
+make report SYSTEM=RTX4090_Lab
+```
+
+### Apple Silicon Mac (MPS)
+
+```bash
+git clone https://github.com/rakexhs/tokenscope-llama-latency-lab.git
+cd tokenscope-llama-latency-lab
+python3 -m venv .venv
+source .venv/bin/activate
+make install-cpu
+make full-mps SYSTEM=MacBook_Pro_M3
+```
+
+Or step by step:
+
+```bash
+make test
+make bench-mps SYSTEM=MacBook_Pro_M3
+make bench-cpu SYSTEM=MacBook_Pro_M3
+make sweep-seq SYSTEM=MacBook_Pro_M3
+make decompose SYSTEM=MacBook_Pro_M3
+make bandwidth SYSTEM=MacBook_Pro_M3
+make plots SYSTEM=MacBook_Pro_M3
+make report SYSTEM=MacBook_Pro_M3
+```
+
+---
+
+## Using Real LLaMA Models
+
+### GGUF Models via llama.cpp (recommended — lower RAM, runs on CPU too)
+
+Download a GGUF from [HuggingFace](https://huggingface.co/TheBloke), then:
+
+```bash
+make install
+make bench-gpu SYSTEM=My_Machine MODEL=/path/to/llama-2-7b-q4_k_m.gguf
+```
+
+### KV-Cache Quantization Experiments (requires GGUF)
+
+```bash
+make sweep-kv SYSTEM=My_Machine
+make plots SYSTEM=My_Machine
+make report SYSTEM=My_Machine
+```
+
+> **Note:** Edit `configs/sweep_kv_cache.yaml` to set `model.id_or_path` to your GGUF path,
+> or pass it as an override when calling `python -m bench.sweep` directly.
+
+### HuggingFace Models (requires access approval + GPU RAM)
+
+```bash
+huggingface-cli login
+python -m bench.run_bench \
+  --config configs/bench_default.yaml \
+  --system My_GPU \
+  --override backend=hf device=cuda \
+  model.id_or_path=meta-llama/Llama-2-7b-hf
+```
+
+---
+
+## Where to Find Results
+
+After running benchmarks and analysis for a system named `My_Laptop`:
+
+| What | Path |
+|---|---|
+| Raw trial data (JSONL) | `results/My_Laptop/raw/*.jsonl` |
+| Per-run summary CSV | `results/My_Laptop/summary/bench_*.csv` |
+| Aggregate CSV (all runs) | `results/My_Laptop/summary/agg_latest.csv` |
+| Decomposition CSV | `results/My_Laptop/summary/decomp_*.csv` |
+| Inflection points | `results/My_Laptop/summary/inflections_sweep.csv` |
+| Run manifests | `results/My_Laptop/report/manifest_*.json` |
+| Findings report | `results/My_Laptop/report/report_latest.md` |
+| All plots (PNG + PDF) | `results/My_Laptop/figures/` |
+
+---
 
 ## Repository Structure
 
 ```
 tokenscope-llama-latency-lab/
-├── bench/                     # Benchmark harness
-│   ├── run_bench.py           # Main CLI entry point
-│   ├── sweep.py               # Sweep runner for YAML-defined parameter sweeps
-│   ├── methodology.py         # Methodology constants and documentation
-│   ├── registry.py            # Run ID generation, config hashing, manifest writing
-│   ├── results_schema.py      # Canonical dataclasses for all result records
+├── bench/                      # Benchmark harness
+│   ├── run_bench.py            #   Main benchmark CLI
+│   ├── sweep.py                #   Sweep runner
+│   ├── methodology.py          #   Methodology constants
+│   ├── registry.py             #   Run ID, config hash, manifests
+│   ├── results_schema.py       #   Result dataclasses
 │   ├── backends/
-│   │   ├── base.py            # Abstract backend interface
-│   │   ├── hf_backend.py      # HuggingFace Transformers (loop_decode + generate)
-│   │   └── llamacpp_backend.py # llama.cpp via llama-cpp-python (GGUF, KV quant)
+│   │   ├── base.py             #   Abstract backend
+│   │   ├── hf_backend.py       #   HuggingFace Transformers
+│   │   └── llamacpp_backend.py #   llama.cpp (GGUF, KV quant)
 │   └── utils/
-│       ├── env_info.py        # Environment snapshot for reproducibility
-│       ├── stats.py           # IQR filter, bootstrap CI, robust summary
-│       ├── timers.py          # perf_counter_ns, CUDA events, device sync
-│       ├── token_tracing.py   # Per-token timestamp recording
-│       ├── io.py              # Atomic JSONL/CSV/JSON writes
-│       └── prompts.py         # Fixed-token-length prompt synthesis
-├── profiling/                 # Latency decomposition
-│   ├── decompose_decode.py    # Hook-instrumented decode profiling
-│   ├── hf_hooks.py            # Module-level timing hooks
-│   ├── torch_profiler_decode.py # torch.profiler operator analysis
-│   ├── nsys_instructions.md   # NVIDIA Nsight Systems guide
-│   └── perf_cpu_instructions.md # Linux perf guide
-├── analysis/                  # Analysis + visualization
-│   ├── figure_style.py        # Centralized matplotlib style (no seaborn)
-│   ├── load_results.py        # Result loading and aggregation
-│   ├── kv_cache_model.py      # Analytical KV cache sizing model
-│   ├── bandwidth_microbench.py # Empirical memory bandwidth measurement
-│   ├── roofline.py            # Roofline model + component classification
-│   ├── predictor_fit.py       # Latency predictor (BW model) fitting
-│   ├── regime_map.py          # Bottleneck regime classification
-│   ├── energy_estimation.py   # Energy-per-token estimation (nvidia-smi)
-│   ├── make_plots.py          # Generate all analysis plots
-│   ├── report_tables.py       # Markdown table generators
-│   └── findings_report.py     # Auto-generate findings report
-├── configs/                   # YAML experiment configurations
-│   ├── bench_default.yaml     # Default single-run config
-│   ├── sweep_sequence.yaml    # Sequence-length sweep
-│   ├── sweep_models.yaml      # Model-size sweep
-│   ├── sweep_precision.yaml   # Precision sweep
-│   ├── sweep_kv_cache.yaml    # KV-cache quantization sweep
-│   └── devices_example.yaml   # Cross-platform comparison
-├── docs/                      # Documentation
-│   ├── timing_diagram.md      # Mermaid timing diagram
-│   ├── methodology.md         # Measurement methodology
-│   ├── reproducibility.md     # Reproduction guide
-│   ├── architecture_notes.md  # Architectural analysis + TTFT discussion
-│   ├── kv_cache_quantization.md # KV-quant experiment design
-│   └── grading_checklist.md   # Rubric → command → output mapping
-├── results/                   # Output (gitignored except .gitkeep)
-│   ├── raw/                   # Per-run JSONL traces
-│   ├── summary/               # Aggregated CSVs
-│   ├── figures/               # PNG + PDF plots
-│   └── report/                # Auto-generated reports + manifests
-├── tests/                     # Pytest suite (no model weights needed)
-├── notebooks/
-│   └── analyze_results.ipynb  # Interactive analysis (optional)
+│       ├── system_name.py      #   System name prompt + directory resolution
+│       ├── env_info.py         #   Environment snapshot
+│       ├── stats.py            #   IQR filter, bootstrap CI
+│       ├── timers.py           #   Timing (perf_counter, CUDA events)
+│       ├── token_tracing.py    #   Per-token timestamps
+│       ├── io.py               #   Atomic file writes
+│       └── prompts.py          #   Prompt synthesis
+├── profiling/                  # Latency decomposition
+│   ├── decompose_decode.py     #   Hook-based decode profiling
+│   ├── hf_hooks.py             #   Module-level timing hooks
+│   ├── torch_profiler_decode.py #  torch.profiler analysis
+│   ├── nsys_instructions.md    #   NVIDIA Nsight Systems guide
+│   └── perf_cpu_instructions.md #  Linux perf guide
+├── analysis/                   # Analysis + visualization
+│   ├── figure_style.py         #   Matplotlib style (no seaborn)
+│   ├── load_results.py         #   Result loading
+│   ├── kv_cache_model.py       #   KV cache sizing model
+│   ├── bandwidth_microbench.py #   Memory bandwidth measurement
+│   ├── roofline.py             #   Roofline model
+│   ├── predictor_fit.py        #   Latency predictor fitting
+│   ├── regime_map.py           #   Bottleneck classification
+│   ├── energy_estimation.py    #   Energy-per-token (nvidia-smi)
+│   ├── make_plots.py           #   Plot generation
+│   ├── report_tables.py        #   Markdown tables
+│   └── findings_report.py      #   Auto-generated report
+├── configs/                    # YAML experiment configs
+├── docs/                       # Documentation
+├── results/                    # Output (per-system subdirectories)
+├── tests/                      # Pytest suite
+├── notebooks/                  # Interactive analysis
+├── Makefile                    # All commands live here
 ├── pyproject.toml
-├── Makefile
 └── .github/workflows/ci.yml
 ```
 
 ## Rubric Coverage
 
-| Goal | What | Key Commands |
-|------|------|-------------|
-| **1** | Benchmark harness | `python -m bench.run_bench --config configs/bench_default.yaml` |
-| **2** | Latency decomposition | `python -m profiling.decompose_decode` |
-| **3** | Scaling + inflections | `python -m bench.sweep --config configs/sweep_sequence.yaml` |
-| **4** | Bottleneck reasoning | `python -m analysis.make_plots` + roofline/regime analysis |
-| **5** | KV-cache quantization | `python -m bench.sweep --config configs/sweep_kv_cache.yaml` |
-| **Bonus** | Cross-platform | `configs/devices_example.yaml` |
-| **Bonus** | Energy estimation | `python -m analysis.energy_estimation` |
-| **Bonus** | TTFT optimization | `docs/architecture_notes.md` |
+| Goal | What | Command |
+|------|------|---------|
+| **1** | Benchmark harness | `make bench-cpu SYSTEM=X` |
+| **2** | Latency decomposition | `make decompose SYSTEM=X` |
+| **3** | Scaling + inflections | `make sweep-seq SYSTEM=X` |
+| **4** | Bottleneck reasoning | `make plots SYSTEM=X` (roofline + regime analysis) |
+| **5** | KV-cache quantization | `make sweep-kv SYSTEM=X` |
+| **Bonus** | Cross-platform | Run on multiple machines with different `SYSTEM=` |
+| **Bonus** | Energy estimation | `make energy SYSTEM=X` |
+| **Bonus** | TTFT optimization | See `docs/architecture_notes.md` |
 
-See [`docs/grading_checklist.md`](docs/grading_checklist.md) for a complete mapping.
-
-## Usage Guide
-
-### Single Benchmark Run
-
-```bash
-python -m bench.run_bench --config configs/bench_default.yaml \
-  --system My_Laptop \
-  --override backend=hf device=cpu model.id_or_path=sshleifer/tiny-gpt2
-```
-
-### llama.cpp with GGUF Model
-
-```bash
-pip install llama-cpp-python
-
-python -m bench.run_bench --config configs/bench_default.yaml \
-  --system Lab_RTX4090 \
-  --override backend=llamacpp device=cpu \
-  model.id_or_path=/path/to/llama-2-7b-q4_k_m.gguf
-```
-
-### Parameter Sweeps
-
-```bash
-# Sequence length sweep
-python -m bench.sweep --config configs/sweep_sequence.yaml --system My_Laptop
-
-# KV-cache quantization sweep (requires GGUF)
-python -m bench.sweep --config configs/sweep_kv_cache.yaml --system Lab_RTX4090 \
-  --override model.id_or_path=/path/to/model.gguf
-```
-
-### Full Analysis Pipeline
-
-```bash
-python -m analysis.make_plots --system My_Laptop
-python -m analysis.findings_report --system My_Laptop
-# Report: results/My_Laptop/report/report_latest.md
-```
-
-### Latency Decomposition
-
-```bash
-python -m profiling.decompose_decode \
-  --model sshleifer/tiny-gpt2 --device cpu --n_tokens 16 --system My_Laptop
-```
+See [`docs/grading_checklist.md`](docs/grading_checklist.md) for the complete rubric-to-command mapping.
 
 ## Optimization Summary: KV-Cache Quantization
 
-KV-cache quantization reduces the memory bandwidth required per decode
-token by storing cached keys and values at lower precision:
-
 | KV Precision | Bytes/elem | Memory Reduction | Expected Speedup |
-|-------------|-----------|-----------------|-----------------|
+|---|---|---|---|
 | f16 (baseline) | 2.0 | — | — |
-| q8_0 | 1.0 | 2× | Significant at long contexts |
-| q4_0 | 0.5 | 4× | Maximum at long contexts |
+| q8_0 | 1.0 | 2x | Significant at long contexts |
+| q4_0 | 0.5 | 4x | Maximum at long contexts |
 
 The optimization is most effective when KV cache access dominates decode
 latency (long contexts, small models). At short contexts where weight
@@ -235,15 +389,17 @@ streaming dominates, the benefit is minimal.
 See [`docs/kv_cache_quantization.md`](docs/kv_cache_quantization.md) for
 full experiment design and architectural interpretation.
 
-## Tests
+## Troubleshooting
 
-```bash
-pip install -e ".[dev]"
-python -m pytest tests/ -v
-```
-
-Tests validate statistical utilities, schema serialization, KV cache math,
-and predictor fit correctness — all without requiring model weights.
+| Problem | Solution |
+|---|---|
+| `ModuleNotFoundError: No module named 'torch'` | Run `make install-cpu` or install PyTorch from [pytorch.org](https://pytorch.org) |
+| `ModuleNotFoundError: No module named 'llama_cpp'` | Run `make install` (includes llama-cpp-python) |
+| `error: externally-managed-environment` | Create a virtual environment first (see Setup section) |
+| MPS errors on Apple Silicon | Use `make bench-cpu` as fallback; MPS support varies by PyTorch version |
+| `FileNotFoundError` for GGUF model | Provide the full absolute path via `MODEL=/full/path/to/file.gguf` |
+| No plots generated | Run benchmarks first (`make bench-cpu`), then `make plots` |
+| Tests fail | Run `make install-cpu` to ensure all dependencies are installed |
 
 ## License
 
