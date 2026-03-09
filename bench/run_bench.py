@@ -16,6 +16,7 @@ import yaml
 from tqdm import tqdm
 
 from bench.backends import get_backend
+from bench.backends.base import ProgressCallback
 from bench.methodology import DEFAULT_CONFIG
 from bench.registry import make_run_id, save_result
 from bench.results_schema import BenchmarkResult, RunConfig
@@ -71,6 +72,27 @@ def load_config(config_path: str, overrides: list[str] | None = None) -> dict[st
     if overrides:
         config = _apply_dot_overrides(config, overrides)
     return config
+
+
+def _make_token_progress_bar(desc: str, total_tokens: int, position: int) -> tuple[tqdm, ProgressCallback]:
+    """Create a nested token-level progress bar and callback."""
+    token_bar = tqdm(
+        total=total_tokens,
+        desc=desc,
+        position=position,
+        leave=False,
+        dynamic_ncols=True,
+        disable=total_tokens <= 0,
+    )
+
+    def _update(tokens_done: int, total: int) -> None:
+        if token_bar.disable:
+            return
+        token_bar.total = max(total, 1)
+        token_bar.n = min(tokens_done, token_bar.total)
+        token_bar.refresh()
+
+    return token_bar, _update
 
 
 def run_benchmark(
@@ -134,19 +156,53 @@ def run_benchmark(
 
     # Warmup
     print(f"[TokenScope] Running {warmup_runs} warmup(s)...")
-    for _ in range(warmup_runs):
-        backend.run_trial(prompt, output_length, trial_idx=-1, temperature=temperature,
-                          top_p=top_p, seed=seed)
+    for warmup_idx in tqdm(
+        range(warmup_runs),
+        desc="Warmups",
+        disable=warmup_runs < 1,
+        dynamic_ncols=True,
+        position=0,
+    ):
+        token_bar, progress_callback = _make_token_progress_bar(
+            desc=f"Warmup {warmup_idx + 1}/{warmup_runs}",
+            total_tokens=output_length,
+            position=1,
+        )
+        try:
+            backend.run_trial(
+                prompt,
+                output_length,
+                trial_idx=-1,
+                temperature=temperature,
+                top_p=top_p,
+                seed=seed,
+                progress_callback=progress_callback,
+            )
+        finally:
+            token_bar.close()
 
     # Trials
     print(f"[TokenScope] Running {trials} trial(s)...")
     trial_records = []
-    for i in tqdm(range(trials), desc="Trials", disable=trials < 3):
-        record = backend.run_trial(
-            prompt, output_length, trial_idx=i,
-            temperature=temperature, top_p=top_p, seed=seed,
+    for i in tqdm(range(trials), desc="Trials", disable=trials < 1, dynamic_ncols=True, position=0):
+        token_bar, progress_callback = _make_token_progress_bar(
+            desc=f"Trial {i + 1}/{trials}",
+            total_tokens=output_length,
+            position=1,
         )
-        trial_records.append(record)
+        try:
+            record = backend.run_trial(
+                prompt,
+                output_length,
+                trial_idx=i,
+                temperature=temperature,
+                top_p=top_p,
+                seed=seed,
+                progress_callback=progress_callback,
+            )
+            trial_records.append(record)
+        finally:
+            token_bar.close()
 
     result = BenchmarkResult(
         config=run_config,

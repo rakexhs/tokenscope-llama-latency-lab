@@ -15,6 +15,7 @@ TokenScope is an end-to-end performance forensics lab for autoregressive LLM inf
 - **KV-Cache Quantization** — Implemented optimization comparing f16/q8_0/q4_0 KV precision with speedup analysis
 - **Auto-Generated Report** — Publication-quality figures and a structured findings report from the latest results
 - **Multi-System Support** — Every command tags results by system name so you can benchmark across machines and compare side-by-side
+- **Live Progress Feedback** — Warmups, trials, and token generation now display progress bars so large-model runs do not look stuck
 
 ---
 

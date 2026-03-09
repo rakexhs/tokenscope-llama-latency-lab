@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import Any
 
 from bench.results_schema import TrialRecord
 from bench.utils.token_tracing import TokenTrace
+
+ProgressCallback = Callable[[int, int], None]
 
 
 class Backend(ABC):
@@ -27,6 +30,7 @@ class Backend(ABC):
         temperature: float,
         top_p: float,
         seed: int,
+        progress_callback: ProgressCallback | None = None,
     ) -> TokenTrace:
         """Run a single generation, returning a TokenTrace with per-token timestamps."""
 
@@ -49,9 +53,17 @@ class Backend(ABC):
         temperature: float = 0.0,
         top_p: float = 1.0,
         seed: int = 42,
+        progress_callback: ProgressCallback | None = None,
     ) -> TrialRecord:
         """Run a single trial and return a TrialRecord."""
-        trace = self.generate_traced(prompt, output_length, temperature, top_p, seed)
+        trace = self.generate_traced(
+            prompt,
+            output_length,
+            temperature,
+            top_p,
+            seed,
+            progress_callback=progress_callback,
+        )
         return TrialRecord(
             trial_idx=trial_idx,
             ttft_ms=trace.ttft_ms,

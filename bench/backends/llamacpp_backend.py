@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from bench.backends.base import Backend
+from bench.backends.base import Backend, ProgressCallback
 from bench.utils.token_tracing import TokenTrace
 
 # Mapping from config strings to llama-cpp-python KV type constants.
@@ -84,12 +84,14 @@ class LlamaCppBackend(Backend):
         temperature: float,
         top_p: float,
         seed: int,
+        progress_callback: ProgressCallback | None = None,
     ) -> TokenTrace:
         """Stream tokens from llama.cpp, recording emission timestamps."""
         assert self.llm is not None
 
         trace = TokenTrace()
         trace.mark_start()
+        emitted_tokens = 0
 
         gen_kwargs: dict[str, Any] = {
             "prompt": prompt,
@@ -111,6 +113,9 @@ class LlamaCppBackend(Backend):
             text = chunk["choices"][0].get("text", "")
             if text:
                 trace.mark_token()
+                emitted_tokens += 1
+                if progress_callback is not None:
+                    progress_callback(emitted_tokens, output_length)
             if chunk["choices"][0].get("finish_reason") is not None:
                 break
 

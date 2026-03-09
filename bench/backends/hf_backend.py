@@ -7,7 +7,7 @@ from typing import Any
 
 import torch
 
-from bench.backends.base import Backend
+from bench.backends.base import Backend, ProgressCallback
 from bench.utils.timers import sync_device
 from bench.utils.token_tracing import TokenTrace
 
@@ -76,10 +76,25 @@ class HFBackend(Backend):
         temperature: float,
         top_p: float,
         seed: int,
+        progress_callback: ProgressCallback | None = None,
     ) -> TokenTrace:
         if self.mode == "loop_decode":
-            return self._loop_decode(prompt, output_length, temperature, top_p, seed)
-        return self._generate_mode(prompt, output_length, temperature, top_p, seed)
+            return self._loop_decode(
+                prompt,
+                output_length,
+                temperature,
+                top_p,
+                seed,
+                progress_callback=progress_callback,
+            )
+        return self._generate_mode(
+            prompt,
+            output_length,
+            temperature,
+            top_p,
+            seed,
+            progress_callback=progress_callback,
+        )
 
     @torch.inference_mode()
     def _loop_decode(
@@ -89,6 +104,7 @@ class HFBackend(Backend):
         temperature: float,
         top_p: float,
         seed: int,
+        progress_callback: ProgressCallback | None = None,
     ) -> TokenTrace:
         """Token-by-token decoding with past_key_values for precise timing."""
         assert self.model is not None and self.tokenizer is not None
@@ -111,6 +127,9 @@ class HFBackend(Backend):
         trace.mark_token()  # TTFT
 
         generated = [next_token.item()]
+        tokens_done = 1
+        if progress_callback is not None:
+            progress_callback(tokens_done, output_length)
 
         # Decode loop
         for _ in range(output_length - 1):
@@ -127,6 +146,9 @@ class HFBackend(Backend):
             sync_device(self.device_str)
             trace.mark_token()
             generated.append(next_token.item())
+            tokens_done += 1
+            if progress_callback is not None:
+                progress_callback(tokens_done, output_length)
 
             if next_token.item() == self.tokenizer.eos_token_id:
                 break
@@ -141,6 +163,7 @@ class HFBackend(Backend):
         temperature: float,
         top_p: float,
         seed: int,
+        progress_callback: ProgressCallback | None = None,
     ) -> TokenTrace:
         """Use model.generate() — less granular but included for comparison."""
         assert self.model is not None and self.tokenizer is not None
@@ -170,6 +193,8 @@ class HFBackend(Backend):
         interval = (end_ns - start_ns) / max(n_new, 1)
         for i in range(n_new):
             trace.token_timestamps_ns.append(int(start_ns + interval * (i + 1)))
+        if progress_callback is not None and n_new > 0:
+            progress_callback(n_new, max(n_new, output_length))
 
         return trace
 
