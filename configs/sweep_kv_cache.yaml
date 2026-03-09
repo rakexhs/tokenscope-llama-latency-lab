@@ -1,0 +1,39 @@
+# TokenScope — KV-cache quantization sweep (Goal 5 optimization)
+# Compares KV cache precision: f16 vs q8_0 vs q4_0
+# Usage: python -m bench.sweep --config configs/sweep_kv_cache.yaml
+#
+# Requires llama.cpp backend and a GGUF model file.
+# Override model path: --override model.id_or_path=/path/to/model.gguf
+
+base:
+  backend: llamacpp
+  device: cpu
+  model:
+    id_or_path: /path/to/your/model.gguf
+  generation:
+    output_length: 64
+    temperature: 0.0
+    seed: 42
+  benchmark:
+    warmup_runs: 2
+    trials: 5
+    iqr_filter: true
+    steady_state_skip: 2
+  llamacpp:
+    n_threads: 0
+    n_gpu_layers: 0
+
+sweep:
+  generation.prompt_length:
+    - 128
+    - 256
+    - 512
+    - 1024
+  llamacpp.kv_type_k:
+    - f16
+    - q8_0
+    - q4_0
+  llamacpp.kv_type_v:
+    - f16
+    - q8_0
+    - q4_0

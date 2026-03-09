@@ -1,0 +1,49 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+
+# Results (keep structure, ignore data)
+results/raw/*.jsonl
+results/summary/*.csv
+results/summary/*.json
+results/figures/*.png
+results/figures/*.pdf
+results/report/*.md
+results/report/*.json
+!results/**/.gitkeep
+
+# Models
+*.gguf
+*.bin
+*.safetensors
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Profiler output
+*.nsys-rep
+*.qdrep
+*.sqlite
+chrome_trace*.json

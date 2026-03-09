@@ -1,0 +1,29 @@
+# TokenScope — Precision sweep
+# Measures impact of weight precision on decode latency.
+# Usage: python -m bench.sweep --config configs/sweep_precision.yaml
+#
+# Note: fp16/bf16 require GPU or Apple Silicon. On CPU-only, fp32 is used.
+# For llama.cpp, precision is determined by the GGUF quantization variant.
+
+base:
+  backend: hf
+  device: cpu
+  model:
+    id_or_path: sshleifer/tiny-gpt2
+  generation:
+    prompt_length: 64
+    output_length: 32
+    temperature: 0.0
+    seed: 42
+  benchmark:
+    warmup_runs: 2
+    trials: 5
+    iqr_filter: true
+    steady_state_skip: 2
+  hf:
+    mode: loop_decode
+
+sweep:
+  hf.dtype:
+    - fp32
+    - auto

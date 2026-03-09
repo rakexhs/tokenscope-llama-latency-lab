@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tokenscope-llama-latency-lab"
+version = "0.1.0"
+description = "Token-Generation Latency Forensics + KV-Cache Architecture Study for LLaMA"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [{name = "TokenScope Contributors"}]
+
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "matplotlib>=3.7",
+    "pyyaml>=6.0",
+    "tqdm>=4.65",
+    "psutil>=5.9",
+]
+
+[project.optional-dependencies]
+hf = [
+    "torch>=2.0",
+    "transformers>=4.30",
+    "accelerate>=0.20",
+]
+llamacpp = [
+    "llama-cpp-python>=0.2.0",
+]
+dev = [
+    "pytest>=7.4",
+    "ruff>=0.1",
+]
+all = [
+    "tokenscope-llama-latency-lab[hf,llamacpp,dev]",
+]
+
+[tool.setuptools.packages.find]
+include = ["bench*", "profiling*", "analysis*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]

@@ -1,0 +1,28 @@
+# TokenScope — Model-size sweep
+# Compare latency across different model sizes.
+# Usage: python -m bench.sweep --config configs/sweep_models.yaml
+#
+# For real experiments, replace model IDs with actual LLaMA GGUF paths
+# or HF model IDs of different sizes.
+
+base:
+  backend: hf
+  device: cpu
+  generation:
+    prompt_length: 64
+    output_length: 32
+    temperature: 0.0
+    seed: 42
+  benchmark:
+    warmup_runs: 2
+    trials: 5
+    iqr_filter: true
+    steady_state_skip: 2
+  hf:
+    mode: loop_decode
+    dtype: auto
+
+sweep:
+  model.id_or_path:
+    - sshleifer/tiny-gpt2
+    - distilgpt2
