@@ -82,6 +82,20 @@ All tests should pass. No model weights are needed.
 
 ---
 
+## How MODEL Works
+
+All commands accept an optional `MODEL=` parameter:
+
+- **If you don't provide `MODEL=`** — the default `sshleifer/tiny-gpt2` is used (auto-downloaded, ~500 KB). Good for verifying the pipeline works.
+- **If you provide a `.gguf` file** — the `llamacpp` backend is auto-selected. Example: `MODEL=/path/to/llama-3b.gguf`
+- **If you provide an HF model ID** — the `hf` backend is auto-selected. Example: `MODEL=meta-llama/Llama-2-7b-hf`
+
+For profiling targets (`decompose`, `profiler`), which require an HF model: if you pass a `.gguf` file, they automatically fall back to `tiny-gpt2` since GGUF files are not compatible with HF hooks.
+
+You can override the auto-detected backend with `BACKEND=hf` or `BACKEND=llamacpp` if needed.
+
+---
+
 ## System Name
 
 Every command uses `SYSTEM=` to tag which machine produced the results.
@@ -89,7 +103,7 @@ This keeps each machine's data in its own folder under `results/`.
 
 ```
 results/
-├── MacBook_Pro_M3/        # Your laptop
+├── MacBook_Air_M1/        # Your laptop
 │   ├── raw/               # Per-run JSONL traces
 │   ├── summary/           # Aggregated CSVs
 │   ├── figures/           # PNG + PDF plots
@@ -103,7 +117,7 @@ results/
 If you forget `SYSTEM=`, you will be prompted interactively:
 
 ```
-Enter System Name: MacBook_Pro_M3
+Enter System Name: MacBook_Air_M1
 ```
 
 To see all systems with saved results:
@@ -119,24 +133,21 @@ make systems
 Pick the one that matches your hardware:
 
 ```bash
-# CPU-only machine (no GPU or GGUF needed)
+# Without a custom model (uses tiny-gpt2)
 make full-cpu SYSTEM=My_Machine
-
-# NVIDIA GPU machine (requires a GGUF model file)
-make full-gpu SYSTEM=My_Machine MODEL=/path/to/model.gguf
-
-# Apple Silicon Mac
 make full-mps SYSTEM=My_Machine
+
+# With your own model (GGUF auto-selects llamacpp backend)
+make full-cpu SYSTEM=My_Machine MODEL=/path/to/llama-3b.gguf
+make full-mps SYSTEM=My_Machine MODEL=/path/to/llama-3b.gguf
+
+# NVIDIA GPU (MODEL= required)
+make full-gpu SYSTEM=My_Machine MODEL=/path/to/model.gguf
 ```
 
 Each full pipeline runs: **test → benchmark → sweep → decompose → bandwidth → plots → report**.
 
-- `full-cpu` and `full-mps` use `sshleifer/tiny-gpt2` (auto-downloaded, ~500 KB).
-- `full-gpu` uses your GGUF model for benchmarks and sweeps, plus `tiny-gpt2` for HF decomposition.
-
 Your findings report will be at: `results/My_Machine/report/report_latest.md`
-
-> **Note:** `full-gpu` requires `MODEL=`. If you forget it, you'll get a clear error message.
 
 ---
 
@@ -144,32 +155,34 @@ Your findings report will be at: `results/My_Machine/report/report_latest.md`
 
 If you prefer to run each step individually, here is every command.
 Always pass `SYSTEM=Your_Machine_Name` to keep results organized.
+Add `MODEL=/path/to/model.gguf` to use a real model instead of tiny-gpt2.
 
 ### Benchmarks
 
 | Command | What it does |
 |---|---|
-| `make bench-cpu SYSTEM=X` | CPU benchmark with tiny-gpt2 (works everywhere) |
-| `make bench-gpu SYSTEM=X MODEL=/path/to.gguf` | GPU benchmark with a GGUF model via llama.cpp |
-| `make bench-mps SYSTEM=X` | Apple Silicon MPS benchmark with tiny-gpt2 |
+| `make bench-cpu SYSTEM=X` | CPU benchmark (tiny-gpt2 or your MODEL) |
+| `make bench-cpu SYSTEM=X MODEL=/path/to.gguf` | CPU benchmark with your GGUF model |
+| `make bench-gpu SYSTEM=X MODEL=/path/to.gguf` | GPU benchmark (GGUF + CUDA, MODEL required) |
+| `make bench-mps SYSTEM=X` | MPS benchmark (tiny-gpt2 or your MODEL) |
 
 ### Sweeps
 
 | Command | What it does |
 |---|---|
-| `make sweep-seq SYSTEM=X` | Sequence-length sweep (CPU, tiny-gpt2) |
-| `make sweep-seq-gpu SYSTEM=X MODEL=/path/to.gguf` | Sequence-length sweep on GPU (llama.cpp) |
+| `make sweep-seq SYSTEM=X` | Sequence-length sweep (uses MODEL or tiny-gpt2) |
+| `make sweep-seq-gpu SYSTEM=X MODEL=/path/to.gguf` | Sequence-length sweep on GPU (MODEL required) |
 | `make sweep-models SYSTEM=X` | Model-size sweep |
 | `make sweep-precision SYSTEM=X` | Precision sweep (fp32 vs. fp16/bf16) |
-| `make sweep-kv SYSTEM=X MODEL=/path/to.gguf` | KV-cache quantization sweep (f16/q8_0/q4_0) |
+| `make sweep-kv SYSTEM=X MODEL=/path/to.gguf` | KV-cache quantization sweep (MODEL required) |
 
 ### Profiling
 
 | Command | What it does |
 |---|---|
-| `make decompose SYSTEM=X` | Latency decomposition on CPU (tiny-gpt2) |
-| `make decompose-gpu SYSTEM=X` | Latency decomposition on CUDA GPU (tiny-gpt2, HF) |
-| `make profiler SYSTEM=X` | torch.profiler operator-level analysis |
+| `make decompose SYSTEM=X` | Latency decomposition on CPU (HF model) |
+| `make decompose-gpu SYSTEM=X` | Latency decomposition on CUDA GPU (HF model) |
+| `make profiler SYSTEM=X` | torch.profiler operator-level analysis (HF model) |
 | `make bandwidth-cpu SYSTEM=X` | Memory bandwidth micro-benchmark (CPU) |
 | `make bandwidth-gpu SYSTEM=X` | Memory bandwidth micro-benchmark (CUDA) |
 | `make bandwidth-mps SYSTEM=X` | Memory bandwidth micro-benchmark (MPS fallback) |
@@ -208,16 +221,11 @@ make install-cpu
 make full-cpu SYSTEM=My_CPU_Machine
 ```
 
-Or step by step:
+With a GGUF model:
 
 ```bash
-make test
-make bench-cpu SYSTEM=My_CPU_Machine
-make sweep-seq SYSTEM=My_CPU_Machine
-make decompose SYSTEM=My_CPU_Machine
-make bandwidth-cpu SYSTEM=My_CPU_Machine
-make plots SYSTEM=My_CPU_Machine
-make report SYSTEM=My_CPU_Machine
+make install
+make full-cpu SYSTEM=My_CPU_Machine MODEL=/path/to/llama-3b.gguf
 ```
 
 ### NVIDIA GPU Machine (CUDA)
@@ -253,20 +261,14 @@ cd tokenscope-llama-latency-lab
 python3 -m venv .venv
 source .venv/bin/activate
 make install-cpu
-make full-mps SYSTEM=MacBook_Pro_M3
+make full-mps SYSTEM=MacBook_Air_M1
 ```
 
-Or step by step:
+With a GGUF model:
 
 ```bash
-make test
-make bench-mps SYSTEM=MacBook_Pro_M3
-make bench-cpu SYSTEM=MacBook_Pro_M3
-make sweep-seq SYSTEM=MacBook_Pro_M3
-make decompose SYSTEM=MacBook_Pro_M3
-make bandwidth-cpu SYSTEM=MacBook_Pro_M3
-make plots SYSTEM=MacBook_Pro_M3
-make report SYSTEM=MacBook_Pro_M3
+make install
+make full-mps SYSTEM=MacBook_Air_M1 MODEL=/path/to/llama-3b.gguf
 ```
 
 ---
@@ -279,7 +281,7 @@ Download a GGUF from [HuggingFace](https://huggingface.co/TheBloke), then:
 
 ```bash
 make install
-make bench-gpu SYSTEM=My_Machine MODEL=/path/to/llama-2-7b-q4_k_m.gguf
+make full-cpu SYSTEM=My_Machine MODEL=/path/to/llama-2-7b-q4_k_m.gguf
 ```
 
 ### KV-Cache Quantization Experiments (requires GGUF)
@@ -296,11 +298,7 @@ make report SYSTEM=My_Machine
 
 ```bash
 huggingface-cli login
-python -m bench.run_bench \
-  --config configs/bench_default.yaml \
-  --system My_GPU \
-  --override backend=hf device=cuda \
-  model.id_or_path=meta-llama/Llama-2-7b-hf
+make bench-cpu SYSTEM=My_GPU MODEL=meta-llama/Llama-2-7b-hf
 ```
 
 ---
@@ -413,7 +411,7 @@ full experiment design and architectural interpretation.
 
 | Problem | Solution |
 |---|---|
-| `MODEL is required` error | GPU/GGUF targets need `MODEL=/path/to/file.gguf` |
+| `MODEL is required` error | Only `bench-gpu`, `sweep-kv`, `sweep-seq-gpu`, and `full-gpu` require MODEL. Other targets default to tiny-gpt2. |
 | `ModuleNotFoundError: No module named 'torch'` | Run `make install-cpu` or install PyTorch from [pytorch.org](https://pytorch.org) |
 | `ModuleNotFoundError: No module named 'llama_cpp'` | Run `make install` (includes llama-cpp-python) |
 | `error: externally-managed-environment` | Create a virtual environment first (see Setup section) |
