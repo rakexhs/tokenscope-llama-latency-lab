@@ -205,6 +205,8 @@ Add `MODEL=/path/to/model.gguf` to use a real model instead of tiny-gpt2.
 | `make analysis SYSTEM=X` | Both plots + report in one command |
 | `make cross-platform` | Cross-platform comparison bundle (Mac M1, WSL_Windows, Colab_H100) |
 | `make gpu-forensics GGUF_SYSTEM=A HF_SYSTEM=B` | Combine GGUF and HF GPU runs for a model into a single forensics bundle |
+| `make cpu-forensics GGUF_SYSTEM=A HF_SYSTEM=B` | Combine GGUF and HF CPU runs for a model into a single forensics bundle |
+| `make mps-forensics GGUF_SYSTEM=A HF_SYSTEM=B` | Combine GGUF and HF MPS runs for a model into a single forensics bundle |
 
 ### Utilities
 

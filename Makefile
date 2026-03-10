@@ -1,7 +1,7 @@
 .PHONY: help install install-cpu test lint systems \
        bench-cpu bench-gpu bench-mps \
        sweep-seq sweep-seq-gpu sweep-models sweep-models-gguf sweep-precision sweep-kv sweep-spec \
-       plots report analysis cross-platform gpu-forensics \
+       plots report analysis cross-platform gpu-forensics cpu-forensics mps-forensics \
        decompose decompose-gpu profiler \
        bandwidth bandwidth-cpu bandwidth-gpu bandwidth-mps energy \
        full-cpu full-gpu full-mps \
@@ -166,7 +166,25 @@ gpu-forensics: ## Combine GGUF + HF GPU results into a single forensics bundle (
 		exit 1; \
 	fi
 	$(PYTHON) -m analysis.gpu_model_forensics --results_dir results --gguf_system "$(GGUF_SYSTEM)" --hf_system "$(HF_SYSTEM)"
-	@echo "\n[TokenScope] GPU model forensics bundle complete. See results/GPU_Model_Forensics/"
+	@echo "\n[TokenScope] GPU model forensics bundle complete. See results/Model_Forensics/"
+
+cpu-forensics: ## Combine GGUF + HF CPU results into a single forensics bundle (requires GGUF_SYSTEM and HF_SYSTEM)
+	@if [ -z "$(GGUF_SYSTEM)" ] || [ -z "$(HF_SYSTEM)" ]; then \
+		echo "ERROR: GGUF_SYSTEM and HF_SYSTEM are required."; \
+		echo "Usage: make cpu-forensics GGUF_SYSTEM=Mac_CPU_GGUF HF_SYSTEM=Mac_CPU_HF"; \
+		exit 1; \
+	fi
+	$(PYTHON) -m analysis.gpu_model_forensics --results_dir results --gguf_system "$(GGUF_SYSTEM)" --hf_system "$(HF_SYSTEM)"
+	@echo "\n[TokenScope] CPU model forensics bundle complete. See results/Model_Forensics/"
+
+mps-forensics: ## Combine GGUF + HF MPS results into a single forensics bundle (requires GGUF_SYSTEM and HF_SYSTEM)
+	@if [ -z "$(GGUF_SYSTEM)" ] || [ -z "$(HF_SYSTEM)" ]; then \
+		echo "ERROR: GGUF_SYSTEM and HF_SYSTEM are required."; \
+		echo "Usage: make mps-forensics GGUF_SYSTEM=Mac_MPS_GGUF HF_SYSTEM=Mac_MPS_HF"; \
+		exit 1; \
+	fi
+	$(PYTHON) -m analysis.gpu_model_forensics --results_dir results --gguf_system "$(GGUF_SYSTEM)" --hf_system "$(HF_SYSTEM)"
+	@echo "\n[TokenScope] MPS model forensics bundle complete. See results/Model_Forensics/"
 
 # When MODEL is a .gguf file, include KV-cache quantization sweep in full-cpu/full-mps
 _KV_SWEEP = $(if $(filter gguf,$(suffix $(MODEL))),sweep-kv,)

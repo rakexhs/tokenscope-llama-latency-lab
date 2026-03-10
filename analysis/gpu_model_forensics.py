@@ -1,10 +1,11 @@
-"""GPU model forensics: compare GGUF (llama.cpp) vs HF (PyTorch) results.
+"""Model forensics: compare GGUF (llama.cpp) vs HF (PyTorch) results on two systems.
 
 This script assumes you have already:
 
-- Run a **GGUF GPU pipeline** (e.g. `make full-gpu SYSTEM=RTX4090_GGUF MODEL=...gguf`)
-- Run **HF GPU forensics** on the same base model (e.g. `make decompose-gpu` / `make profiler`
-  with `SYSTEM=RTX4090_HF` and `MODEL=<hf_id>`)
+- Run a **GGUF pipeline** on some system (e.g. `make full-gpu` / `full-cpu` / `full-mps`
+  with `SYSTEM=GGUF_System` and `MODEL=...gguf`)
+- Run **HF forensics** on the same base model on another system (e.g. `make decompose-gpu`
+  / `make decompose` + `make profiler` with `SYSTEM=HF_System` and `MODEL=<hf_id>`)
 
 It then:
 
@@ -17,8 +18,8 @@ Usage (from project root):
 
     python -m analysis.gpu_model_forensics \\
         --results_dir results \\
-        --gguf_system RTX4090_GGUF \\
-        --hf_system RTX4090_HF
+        --gguf_system GGUF_System_Name \\
+        --hf_system HF_System_Name
 """
 
 from __future__ import annotations
@@ -155,14 +156,14 @@ def plot_gpu_model_comparison(
     hf_rows = _filter_by_model(hf_rows, model_short)
 
     if not gguf_rows or not hf_rows:
-        print("[GPU Forensics] Warning: missing data for one of GGUF/HF; plots may be empty.")
+        print("[Model Forensics] Warning: missing data for one of GGUF/HF; plots may be empty.")
 
     _plot_metric_vs_prompt(
         gguf_rows,
         hf_rows,
         metric_key="per_token_mean_ms",
         ylabel="Per-token Latency (ms)",
-        title=f"GPU Per-Token Latency vs Context — {model_short}",
+        title=f"Per-Token Latency vs Context — {model_short}",
         output_path=output_dir / "gpu_model_per_token",
     )
 
@@ -171,7 +172,7 @@ def plot_gpu_model_comparison(
         hf_rows,
         metric_key="ttft_mean_ms",
         ylabel="TTFT (ms)",
-        title=f"GPU Time to First Token vs Context — {model_short}",
+        title=f"Time to First Token vs Context — {model_short}",
         output_path=output_dir / "gpu_model_ttft",
     )
 
@@ -180,13 +181,13 @@ def plot_gpu_model_comparison(
         hf_rows,
         metric_key="throughput_mean_tok_s",
         ylabel="Throughput (tok/s)",
-        title=f"GPU Throughput vs Context — {model_short}",
+        title=f"Throughput vs Context — {model_short}",
         output_path=output_dir / "gpu_model_throughput",
     )
 
 
 def copy_gpu_artifacts(results_dir: Path, gguf_system: str, hf_system: str, output_dir: Path) -> None:
-    """Copy key per-system artifacts into a unified GPU forensics bundle."""
+    """Copy key per-system artifacts into a unified GGUF+HF forensics bundle."""
     gguf_dir = results_dir / gguf_system
     hf_dir = results_dir / hf_system
 
@@ -246,16 +247,16 @@ def write_gpu_forensics_report(
     model_short: str,
     output_dir: Path,
 ) -> None:
-    """Small Markdown summary describing the GPU forensics bundle."""
+    """Small Markdown summary describing the GGUF+HF forensics bundle."""
     lines = [
-        "# GPU Model Forensics Report",
+        "# Model Forensics Report",
         "",
         f"**Model:** `{model_short}`",
         "",
         "This folder combines:",
         "",
-        f"- **GGUF / llama.cpp GPU results** from system `{gguf_system}` (benchmark + KV-cache quantization).",
-        f"- **HF / PyTorch GPU forensics** from system `{hf_system}` (latency decomposition + torch.profiler).",
+        f"- **GGUF / llama.cpp results** from system `{gguf_system}` (benchmark + KV-cache quantization where available).",
+        f"- **HF / PyTorch forensics** from system `{hf_system}` (latency decomposition + torch.profiler where available).",
         "",
         "## Contents",
         "",
@@ -272,11 +273,11 @@ def write_gpu_forensics_report(
         "",
         "### `hf_system/`",
         "",
-        "- Latency decomposition stacked plots (`decomp_stacked_*.{png,pdf}`).",
-        "- Torch profiler outputs (`torch_profile_ops.{csv,md}`).",
+        "- Latency decomposition stacked plots (`decomp_stacked_*.{png,pdf}`), when available.",
+        "- Torch profiler outputs (`torch_profile_ops.{csv,md}`), when available.",
         "- `report_latest.md` — TokenScope report for the HF GPU runs.",
         "",
-        "Use these side-by-side artifacts to discuss how runtime, KV-cache behavior, and framework/overhead differ between GGUF (llama.cpp) and HF (PyTorch) for the same base model on GPU.",
+        "Use these side-by-side artifacts to discuss how runtime, KV-cache behavior, and framework/overhead differ between GGUF (llama.cpp) and HF (PyTorch) for the same base model on each system.",
         "",
     ]
     path = output_dir / "gpu_model_forensics_report.md"
@@ -288,7 +289,7 @@ def run(
     gguf_system: str = "",
     hf_system: str = "",
 ) -> None:
-    """Entry point for programmatic use."""
+    """Entry point for programmatic use (CPU / GPU / MPS)."""
     if not gguf_system or not hf_system:
         raise ValueError("gguf_system and hf_system are required.")
 
@@ -303,21 +304,21 @@ def run(
 
     model_short = _infer_common_model_short(gguf_rows, hf_rows)
 
-    output_dir = results_dir / "GPU_Model_Forensics" / model_short
+    output_dir = results_dir / "Model_Forensics" / model_short
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"[GPU Forensics] Comparing GGUF='{gguf_system}' vs HF='{hf_system}' for model '{model_short}'.")
+    print(f"[Model Forensics] Comparing GGUF='{gguf_system}' vs HF='{hf_system}' for model '{model_short}'.")
 
-    print("[GPU Forensics] Generating comparison plots...")
+    print("[Model Forensics] Generating comparison plots...")
     plot_gpu_model_comparison(gguf_rows, hf_rows, output_dir, model_short)
 
-    print("[GPU Forensics] Copying per-system artifacts...")
+    print("[Model Forensics] Copying per-system artifacts...")
     copy_gpu_artifacts(results_dir, gguf_system, hf_system, output_dir)
 
-    print("[GPU Forensics] Writing summary report...")
+    print("[Model Forensics] Writing summary report...")
     write_gpu_forensics_report(gguf_system, hf_system, model_short, output_dir)
 
-    print(f"[GPU Forensics] Done. Output: {output_dir}")
+    print(f"[Model Forensics] Done. Output: {output_dir}")
 
 
 def main() -> None:
