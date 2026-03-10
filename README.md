@@ -446,9 +446,9 @@ tokenscope-llama-latency-lab/
 | **3** | Scaling + inflections | `make sweep-seq SYSTEM=X` |
 | **4** | Bottleneck reasoning | `make plots SYSTEM=X` (roofline + regime analysis) |
 | **5** | KV-cache quantization | `make sweep-kv SYSTEM=X MODEL=...` |
-| **Bonus** | Cross-platform | Run on multiple machines with different `SYSTEM=` |
-| **Bonus** | Energy estimation | `make energy SYSTEM=X` |
-| **Bonus** | TTFT optimization | See `docs/architecture_notes.md` |
+| **6** | Cross-platform | Run on multiple machines with different `SYSTEM=` |
+| **7** | Energy estimation | `make energy SYSTEM=X` |
+| **8** | TTFT optimization | See `docs/architecture_notes.md` |
 
 See [`docs/grading_checklist.md`](docs/grading_checklist.md) for the complete rubric-to-command mapping.
 
