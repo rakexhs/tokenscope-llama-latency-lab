@@ -1,7 +1,7 @@
 .PHONY: help install install-cpu test lint systems \
        bench-cpu bench-gpu bench-mps \
        sweep-seq sweep-seq-gpu sweep-models sweep-models-gguf sweep-precision sweep-kv sweep-spec \
-       plots report analysis cross-platform \
+       plots report analysis cross-platform gpu-forensics \
        decompose decompose-gpu profiler \
        bandwidth bandwidth-cpu bandwidth-gpu bandwidth-mps energy \
        full-cpu full-gpu full-mps \
@@ -158,6 +158,15 @@ analysis: plots report ## Full analysis pipeline (plots + report)
 cross-platform: ## Cross-platform comparison (Mac M1, WSL_Windows, Colab_H100)
 	$(PYTHON) -m analysis.cross_platform_compare --results_dir results
 	@echo "\n[TokenScope] Cross-platform comparison complete. See results/Cross-Platform Comp Result/"
+
+gpu-forensics: ## Combine GGUF + HF GPU results into a single forensics bundle (requires GGUF_SYSTEM and HF_SYSTEM)
+	@if [ -z "$(GGUF_SYSTEM)" ] || [ -z "$(HF_SYSTEM)" ]; then \
+		echo "ERROR: GGUF_SYSTEM and HF_SYSTEM are required."; \
+		echo "Usage: make gpu-forensics GGUF_SYSTEM=RTX4090_GGUF HF_SYSTEM=RTX4090_HF"; \
+		exit 1; \
+	fi
+	$(PYTHON) -m analysis.gpu_model_forensics --results_dir results --gguf_system "$(GGUF_SYSTEM)" --hf_system "$(HF_SYSTEM)"
+	@echo "\n[TokenScope] GPU model forensics bundle complete. See results/GPU_Model_Forensics/"
 
 # When MODEL is a .gguf file, include KV-cache quantization sweep in full-cpu/full-mps
 _KV_SWEEP = $(if $(filter gguf,$(suffix $(MODEL))),sweep-kv,)

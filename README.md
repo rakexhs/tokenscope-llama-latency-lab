@@ -203,6 +203,8 @@ Add `MODEL=/path/to/model.gguf` to use a real model instead of tiny-gpt2.
 | `make plots SYSTEM=X` | Generate all figures (scaling, TTFT, throughput, KV cache, etc.) |
 | `make report SYSTEM=X` | Generate findings report (Markdown with embedded plots) |
 | `make analysis SYSTEM=X` | Both plots + report in one command |
+| `make cross-platform` | Cross-platform comparison bundle (Mac M1, WSL_Windows, Colab_H100) |
+| `make gpu-forensics GGUF_SYSTEM=A HF_SYSTEM=B` | Combine GGUF and HF GPU runs for a model into a single forensics bundle |
 
 ### Utilities
 
