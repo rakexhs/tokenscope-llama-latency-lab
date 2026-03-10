@@ -1,0 +1,2 @@
+system_name,available,avg_power_w,elapsed_s,total_joules,joules_per_token,n_tokens,n_power_samples
+Colab_H100,True,117.41,0.724,85.009,2.6565,32,10
