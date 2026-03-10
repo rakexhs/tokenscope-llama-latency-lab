@@ -12,6 +12,12 @@ import matplotlib.pyplot as plt
 # Consistent color palette (colorblind-friendly, high contrast)
 COLORS = {
     "embedding": "#4C72B0",
+    # Fine-grained attention sub-components
+    "q_proj": "#1F77B4",  # blue
+    "k_proj": "#FF7F0E",  # orange
+    "v_proj": "#2CA02C",  # green
+    "o_proj": "#D62728",  # red
+    "softmax": "#9467BD",  # purple
     "attention": "#DD8452",
     "mlp": "#55A868",
     "layernorm": "#C44E52",

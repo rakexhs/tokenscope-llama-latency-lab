@@ -25,15 +25,30 @@ class HookTimer:
 
     def _pre_hook(self, name: str):
         def hook(module: nn.Module, inputs: Any) -> None:
-            if torch.cuda.is_available() and next(module.parameters(), torch.tensor(0)).is_cuda:
+            # Synchronize to attribute time to this module (esp. on CUDA/MPS).
+            p = next(module.parameters(), None)
+            if p is not None and getattr(p, "is_cuda", False) and torch.cuda.is_available():
                 torch.cuda.synchronize()
+            if p is not None and getattr(p, "is_mps", False):
+                try:
+                    if hasattr(torch, "mps") and hasattr(torch.mps, "synchronize"):
+                        torch.mps.synchronize()
+                except Exception:
+                    pass
             self._start_times[name] = time.perf_counter_ns()
         return hook
 
     def _post_hook(self, name: str):
         def hook(module: nn.Module, inputs: Any, output: Any) -> None:
-            if torch.cuda.is_available() and next(module.parameters(), torch.tensor(0)).is_cuda:
+            p = next(module.parameters(), None)
+            if p is not None and getattr(p, "is_cuda", False) and torch.cuda.is_available():
                 torch.cuda.synchronize()
+            if p is not None and getattr(p, "is_mps", False):
+                try:
+                    if hasattr(torch, "mps") and hasattr(torch.mps, "synchronize"):
+                        torch.mps.synchronize()
+                except Exception:
+                    pass
             end = time.perf_counter_ns()
             start = self._start_times.pop(name, end)
             self.records[name].append((end - start) / 1_000_000)
@@ -81,10 +96,30 @@ class HookTimer:
         for name, mod in model.named_modules():
             lower = name.lower()
             cls_name = type(mod).__name__.lower()
+            in_attn_path = ".attn" in lower or ".attention" in lower
 
+            # Fine-grained classification.  Identify Q/K/V projection layers, softmax,
+            # as well as traditional high-level components.
+            # Projection layers often appear as Linear modules with names ending in q_proj/k_proj/v_proj/o_proj.
             if any(k in lower for k in ("embed", "wte", "wpe")):
                 components["embedding"].append((name, mod))
+            elif "q_proj" in lower:
+                components["q_proj"].append((name, mod))
+            elif "k_proj" in lower:
+                components["k_proj"].append((name, mod))
+            elif "v_proj" in lower:
+                components["v_proj"].append((name, mod))
+            elif "o_proj" in lower or "out_proj" in lower:
+                components["o_proj"].append((name, mod))
+            # GPT-2 style fused projections (QKV and output) live under attn.{c_attn,c_proj}
+            elif in_attn_path and "c_attn" in lower:
+                components["qkv_proj"].append((name, mod))
+            elif in_attn_path and lower.endswith("c_proj"):
+                components["o_proj"].append((name, mod))
+            elif any(k in cls_name for k in ("softmax",)) or "softmax" in lower:
+                components["softmax"].append((name, mod))
             elif any(k in cls_name for k in ("attention", "attn")):
+                # High-level attention block not otherwise classified
                 if "self" in lower or "attn" in lower:
                     components["attention"].append((name, mod))
             elif any(k in cls_name for k in ("mlp", "feedforward", "dense")):
