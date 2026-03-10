@@ -62,6 +62,9 @@ DEFAULT_CONFIG = {
         "temperature": 0.0,
         "top_p": 1.0,
         "seed": 42,
+        # Number of prompts to generate concurrently.  Use 1 for interactive
+        # settings; small values up to 4 allow exploration of batch effects.
+        "batch_size": 1,
     },
     "benchmark": {
         "warmup_runs": 3,
@@ -78,6 +81,14 @@ DEFAULT_CONFIG = {
     "hf": {
         "mode": "loop_decode",
         "dtype": "auto",
+        # Speculative decoding configuration.  When mode="spec_decode", the draft
+        # model identifier and the number of draft tokens proposed per step must
+        # be provided here.  If draft_model_id is not set, speculative decoding
+        # falls back to baseline loop_decode.  See bench/backends/hf_backend.py.
+        "spec": {
+            "draft_model_id": "",
+            "draft_steps": 4,
+        },
     },
 }
 

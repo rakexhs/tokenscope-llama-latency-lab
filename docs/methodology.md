@@ -26,6 +26,11 @@ Each trial runs the full generation pipeline: prompt encoding → prefill →
 autoregressive decode → result collection. Trials are independent — the
 model state (KV cache) is reset between trials.
 
+For batched inference experiments (`generation.batch_size > 1`), multiple
+prompts are decoded concurrently.  The per-token trace records timestamps
+for each token emission across the batch; summary statistics reflect the
+average latency per token across all sequences.
+
 ### Timing Instrumentation
 
 See [timing_diagram.md](timing_diagram.md) for the complete measurement pipeline.
@@ -57,6 +62,10 @@ The first few decode tokens often show elevated latency due to KV cache
 allocation, memory layout initialization, and branch predictor warmup.
 Steady-state statistics exclude these tokens for a more representative
 view of sustained decode performance.
+
+When using speculative decoding (`hf.mode = spec_decode`) the draft model
+proposes multiple tokens in a single step.  Per-token timestamps in this
+mode correspond to accepted tokens after verification by the target model.
 
 ### Confidence Intervals
 

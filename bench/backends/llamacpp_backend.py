@@ -85,9 +85,20 @@ class LlamaCppBackend(Backend):
         top_p: float,
         seed: int,
         progress_callback: ProgressCallback | None = None,
+        *,
+        batch_size: int = 1,
     ) -> TokenTrace:
-        """Stream tokens from llama.cpp, recording emission timestamps."""
+        """Stream tokens from llama.cpp, recording emission timestamps.
+
+        Note: llama-cpp-python currently only supports batch_size=1 for streaming.  For
+        batch_size > 1, a NotImplementedError is raised.  Use the HuggingFace backend
+        for batched inference.
+        """
         assert self.llm is not None
+        if batch_size != 1:
+            raise NotImplementedError(
+                "llama.cpp backend does not support batch_size>1 streaming."
+            )
 
         trace = TokenTrace()
         trace.mark_start()

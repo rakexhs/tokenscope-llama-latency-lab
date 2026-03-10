@@ -115,6 +115,7 @@ def run_benchmark(
     temperature = gen_cfg.get("temperature", 0.0)
     top_p = gen_cfg.get("top_p", 1.0)
     seed = gen_cfg.get("seed", 42)
+    batch_size = gen_cfg.get("batch_size", 1)
     warmup_runs = bench_cfg["warmup_runs"]
     trials = bench_cfg["trials"]
 
@@ -137,6 +138,7 @@ def run_benchmark(
         steady_state_skip=bench_cfg.get("steady_state_skip", 2),
         n_threads=config.get("llamacpp", {}).get("n_threads", 0),
         n_gpu_layers=config.get("llamacpp", {}).get("n_gpu_layers", 0),
+        batch_size=batch_size,
     )
 
     print(f"[TokenScope] Run ID: {run_id}")
@@ -177,6 +179,7 @@ def run_benchmark(
                 top_p=top_p,
                 seed=seed,
                 progress_callback=progress_callback,
+                batch_size=batch_size,
             )
         finally:
             token_bar.close()
@@ -199,6 +202,7 @@ def run_benchmark(
                 top_p=top_p,
                 seed=seed,
                 progress_callback=progress_callback,
+                batch_size=batch_size,
             )
             trial_records.append(record)
         finally:

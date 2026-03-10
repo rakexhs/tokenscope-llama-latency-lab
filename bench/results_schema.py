@@ -53,6 +53,9 @@ class RunConfig:
     steady_state_skip: int = 2
     n_threads: int = 0
     n_gpu_layers: int = 0
+    # Number of parallel prompts to generate in each trial (batch size).  For batch_size>1,
+    # the benchmark will generate multiple sequences concurrently. Default is 1.
+    batch_size: int = 1
 
 
 @dataclass

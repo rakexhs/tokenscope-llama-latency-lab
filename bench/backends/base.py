@@ -31,8 +31,23 @@ class Backend(ABC):
         top_p: float,
         seed: int,
         progress_callback: ProgressCallback | None = None,
+        *,
+        batch_size: int = 1,
     ) -> TokenTrace:
-        """Run a single generation, returning a TokenTrace with per-token timestamps."""
+        """Run a single generation, returning a TokenTrace with per-token timestamps.
+
+        Args:
+            prompt: The prompt string to condition on.  For batch_size > 1, the same
+                prompt will be replicated across the batch.
+            output_length: Number of tokens to generate (per sequence).
+            temperature: Sampling temperature.
+            top_p: Nucleus sampling top_p.
+            seed: Random seed for deterministic sampling.
+            progress_callback: Optional callback to report progress.
+            batch_size: Number of sequences to generate concurrently.  Backends may
+                support only batch_size=1; unsupported batch sizes should raise
+                NotImplementedError.
+        """
 
     @abstractmethod
     def name(self) -> str:
@@ -54,6 +69,8 @@ class Backend(ABC):
         top_p: float = 1.0,
         seed: int = 42,
         progress_callback: ProgressCallback | None = None,
+        *,
+        batch_size: int = 1,
     ) -> TrialRecord:
         """Run a single trial and return a TrialRecord."""
         trace = self.generate_traced(
@@ -63,6 +80,7 @@ class Backend(ABC):
             top_p,
             seed,
             progress_callback=progress_callback,
+            batch_size=batch_size,
         )
         return TrialRecord(
             trial_idx=trial_idx,
