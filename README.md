@@ -302,6 +302,54 @@ make plots SYSTEM=My_Machine
 make report SYSTEM=My_Machine
 ```
 
+### Recommended Cross-Platform + Forensics Setup (Project 6 Style)
+
+To fully reproduce the “Token-Generation Latency in LLaMA” project (CPU/Mac/WSL + GPU + KV-cache optimization + HF forensics), we recommend:
+
+- **1. Choose a GGUF model** (e.g. `Llama-3.2-1B-Instruct-Q4_K_M.gguf`) and save it under `models/`.
+- **2. From the GGUF model card on Hugging Face, note the HF base model ID** (e.g. `meta-llama/Llama-3.2-1B-Instruct`).
+
+Then run:
+
+- **CPU / Mac / WSL with GGUF (benchmark + KV-cache optimization + report)**:
+
+  ```bash
+  make install
+  make full-cpu SYSTEM=My_CPU_Machine MODEL=./models/Llama-3.2-1B-Instruct-Q4_K_M.gguf
+  # or, on Apple Silicon with MPS:
+  make full-mps SYSTEM=My_Mac_M1 MODEL=./models/Llama-3.2-1B-Instruct-Q4_K_M.gguf
+  ```
+
+  When `MODEL` ends with `.gguf`, `full-cpu` / `full-mps` automatically add the **KV-cache sweep** (`sweep-kv`) and then run `plots` and `report`. This yields:
+
+  - Baseline GGUF latency (TTFT, per-token, end-to-end)
+  - KV-cache quantization “before/after” results (f16 vs q8_0 vs q4_0)
+  - A complete findings report for that system.
+
+- **GPU with GGUF (benchmark + KV-cache optimization + energy)**:
+
+  ```bash
+  make install
+  make full-gpu SYSTEM=My_GPU_GGUF MODEL=/abs/path/to/Llama-3.2-1B-Instruct-Q4_K_M.gguf
+  ```
+
+  `full-gpu` always runs the KV-cache sweep (`sweep-kv`) plus GPU-specific steps like `energy`.
+
+- **GPU with HF model (latency decomposition + profiler for forensics)**:
+
+  ```bash
+  huggingface-cli login  # if the model is gated
+  make decompose-gpu SYSTEM=My_GPU_HF MODEL=meta-llama/Llama-3.2-1B-Instruct
+  make profiler      SYSTEM=My_GPU_HF MODEL=meta-llama/Llama-3.2-1B-Instruct
+  ```
+
+  These commands use the **HF backend** and provide:
+
+  - Module-level decode breakdown (embedding, attention, MLP, norms, sampling, overhead)
+  - Operator-level profiling via `torch.profiler`
+
+Note: **KV-cache precision optimization (f16 → q8_0/q4_0) is implemented only for the llama.cpp / GGUF backend.** HF runs provide KV-cache analysis and decomposition, but they do not change KV precision.
+
 ### HuggingFace Models (requires access approval + GPU RAM)
 
 ```bash

@@ -1,4 +1,0 @@
-system_name,device,bandwidth_gb_s,method
-Mac M1,cpu,35.33,numpy_copy
-WSL_Windows,cpu,3.79,numpy_copy
-Colab_H100,cuda,2756.37,torch_clone

@@ -1,4 +1,0 @@
-metric,prompt_length,slope_before,slope_after,ratio,group,system_name
-per_token_mean_ms,128,-0.005278,-0.000652,0.124,/Users/flexy/Desktop/tokenscope-llama-latency-lab/model /Llama-3.2-1B-Instruct-Q4_K_M.gguf,Mac M1
-per_token_mean_ms,64,-0.006939,0.007104,-1.024,./models/Llama-3.2-1B-Instruct-Q4_K_M.gguf,WSL_Windows
-per_token_mean_ms,128,0.057532,0.000423,0.007,/content/models/Llama-3.2-1B-Instruct-Q4_K_M.gguf,Colab_H100
