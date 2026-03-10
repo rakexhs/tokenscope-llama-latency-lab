@@ -15,6 +15,8 @@ import datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from analysis.load_results import (
     group_by,
     load_aggregate_csv,
@@ -147,6 +149,20 @@ def generate_report(results_dir: str = "results", system_name: str = "") -> str:
         sections.append(regime_summary_table(regime_data))
         if (rd / "figures" / "regime_map.png").exists():
             sections.append("\n![Regime Map](../figures/regime_map.png)\n")
+
+    # Speculative decoding (Bonus)
+    spec_baseline = [r for r in rows if "loop_decode" in str(r.get("backend", ""))]
+    spec_decode = [r for r in rows if "spec_decode" in str(r.get("backend", ""))]
+    if spec_baseline and spec_decode:
+        sections.append("## Speculative Decoding Comparison (Bonus)\n")
+        b_pt = [r.get("per_token_mean_ms") for r in spec_baseline if r.get("per_token_mean_ms")]
+        s_pt = [r.get("per_token_mean_ms") for r in spec_decode if r.get("per_token_mean_ms")]
+        if b_pt and s_pt:
+            speedup = np.mean(b_pt) / max(np.mean(s_pt), 1e-9)
+            sections.append(f"Speculative decoding achieves **{speedup:.2f}×** speedup vs. baseline.\n")
+        if (rd / "figures" / "spec_decode_comparison.png").exists():
+            sections.append("\n![Spec Decode](../figures/spec_decode_comparison.png)\n")
+        sections.append("")
 
     # Optimization (KV-cache quant)
     sections.append("## Optimization: KV-Cache Quantization\n")

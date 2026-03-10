@@ -1,13 +1,13 @@
 .PHONY: help install install-cpu test lint systems \
        bench-cpu bench-gpu bench-mps \
-       sweep-seq sweep-seq-gpu sweep-models sweep-precision sweep-kv \
-       plots report analysis \
+       sweep-seq sweep-seq-gpu sweep-models sweep-models-gguf sweep-precision sweep-kv sweep-spec \
+       plots report analysis cross-platform \
        decompose decompose-gpu profiler \
        bandwidth bandwidth-cpu bandwidth-gpu bandwidth-mps energy \
        full-cpu full-gpu full-mps \
        clean _require-model
 
-PYTHON ?= python
+PYTHON ?= python3
 
 # ── User-facing variables ──────────────────────────────────────────────
 # MODEL  — model path or HF ID (defaults to tiny-gpt2 if not provided)
@@ -58,6 +58,11 @@ install-cpu: ## Install with HF backend only (no GPU/llama.cpp deps)
 	pip install -e ".[hf,dev]"
 
 test: ## Run test suite (no model weights needed)
+	@$(PYTHON) -c "import pytest" >/dev/null 2>&1 || ( \
+		echo "ERROR: pytest is not installed in this Python environment."; \
+		echo "       Run: make install-cpu  (or: make install)"; \
+		exit 1; \
+	)
 	$(PYTHON) -m pytest tests/ -v
 
 lint: ## Run ruff linter
@@ -96,8 +101,11 @@ sweep-seq-gpu: _require-model ## Sequence-length sweep on GPU (requires MODEL=)
 	$(PYTHON) -m bench.sweep --config configs/sweep_sequence_gpu.yaml $(SYSTEM_FLAG) \
 		--override model.id_or_path="$(MODEL)"
 
-sweep-models: ## Model-size sweep
+sweep-models: ## Model-size sweep (HF models)
 	$(PYTHON) -m bench.sweep --config configs/sweep_models.yaml $(SYSTEM_FLAG)
+
+sweep-models-gguf: ## Model-size sweep (GGUF only). Edit config paths first.
+	$(PYTHON) -m bench.sweep --config configs/sweep_models_gguf.yaml $(SYSTEM_FLAG)
 
 sweep-precision: ## Precision sweep
 	$(PYTHON) -m bench.sweep --config configs/sweep_precision.yaml $(SYSTEM_FLAG)
@@ -105,6 +113,9 @@ sweep-precision: ## Precision sweep
 sweep-kv: _require-model ## KV-cache quantization sweep (requires MODEL= GGUF)
 	$(PYTHON) -m bench.sweep --config configs/sweep_kv_cache.yaml $(SYSTEM_FLAG) \
 		--override model.id_or_path="$(MODEL)"
+
+sweep-spec: ## Speculative decoding vs baseline (Bonus)
+	$(PYTHON) -m bench.sweep --config configs/sweep_spec_decode.yaml $(SYSTEM_FLAG)
 
 # ── Profiling ──────────────────────────────────────────────────────────
 # decompose/profiler use HF backend only. If MODEL is a .gguf file they
@@ -144,14 +155,21 @@ report: ## Generate findings report (Markdown)
 
 analysis: plots report ## Full analysis pipeline (plots + report)
 
+cross-platform: ## Cross-platform comparison (Mac M1, WSL_Windows, Colab_H100)
+	$(PYTHON) -m analysis.cross_platform_compare --results_dir results
+	@echo "\n[TokenScope] Cross-platform comparison complete. See results/Cross-Platform Comp Result/"
+
+# When MODEL is a .gguf file, include KV-cache quantization sweep in full-cpu/full-mps
+_KV_SWEEP = $(if $(filter gguf,$(suffix $(MODEL))),sweep-kv,)
+
 # ── Full Pipelines (all experiments) ───────────────────────────────────
-full-cpu: test bench-cpu sweep-seq sweep-models sweep-precision decompose profiler bandwidth-cpu plots report ## Full CPU pipeline — all experiments
+full-cpu: test bench-cpu sweep-seq sweep-models sweep-precision decompose profiler bandwidth-cpu $(_KV_SWEEP) plots report ## Full CPU pipeline — all experiments (add sweep-kv when MODEL=path.gguf)
 	@echo "\n[TokenScope] Full CPU pipeline complete. See results/$${SYSTEM:-<system>}/report/report_latest.md"
 
 full-gpu: _require-model test bench-gpu sweep-seq-gpu sweep-models sweep-precision sweep-kv decompose-gpu profiler bandwidth-gpu energy plots report ## Full GPU pipeline — all experiments (requires MODEL=)
 	@echo "\n[TokenScope] Full GPU pipeline complete. See results/$${SYSTEM:-<system>}/report/report_latest.md"
 
-full-mps: test bench-mps sweep-seq sweep-models sweep-precision decompose profiler bandwidth-cpu plots report ## Full MPS pipeline — all experiments
+full-mps: test bench-mps sweep-seq sweep-models sweep-precision decompose profiler bandwidth-cpu $(_KV_SWEEP) plots report ## Full MPS pipeline — all experiments (add sweep-kv when MODEL=path.gguf)
 	@echo "\n[TokenScope] Full MPS pipeline complete. See results/$${SYSTEM:-<system>}/report/report_latest.md"
 
 # ── Cleanup ────────────────────────────────────────────────────────────

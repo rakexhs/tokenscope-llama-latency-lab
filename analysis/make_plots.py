@@ -162,6 +162,51 @@ def plot_throughput(rows: list[dict[str, Any]], output_dir: str) -> None:
     save_fig(fig, f"{output_dir}/throughput_scaling")
 
 
+def plot_spec_decode_comparison(rows: list[dict[str, Any]], output_dir: str) -> None:
+    """Plot baseline vs speculative decoding when both modes are present (Bonus)."""
+    apply_style()
+
+    baseline = [r for r in rows if "loop_decode" in str(r.get("backend", ""))]
+    spec = [r for r in rows if "spec_decode" in str(r.get("backend", ""))]
+    if not baseline or not spec:
+        return
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Per-token latency comparison
+    for label, group, color in [
+        ("Baseline (loop_decode)", baseline, PALETTE[0]),
+        ("Speculative (spec_decode)", spec, PALETTE[1]),
+    ]:
+        x, y = extract_series(group, "prompt_length", "per_token_mean_ms")
+        if len(x) > 0:
+            ax1.plot(x, y, "o-", color=color, label=label, markersize=7)
+
+    ax1.set_xlabel("Prompt Length (tokens)")
+    ax1.set_ylabel("Per-token Latency (ms)")
+    ax1.set_title("Speculative Decoding: Per-Token Latency")
+    ax1.legend()
+
+    # Speedup
+    by_pl: dict[int, list[dict]] = {}
+    for r in baseline + spec:
+        pl = r.get("prompt_length")
+        if pl is not None:
+            by_pl.setdefault(int(pl), []).append(r)
+    for pl, grp in sorted(by_pl.items()):
+        b_vals = [r.get("per_token_mean_ms") for r in grp if "loop_decode" in str(r.get("backend", ""))]
+        s_vals = [r.get("per_token_mean_ms") for r in grp if "spec_decode" in str(r.get("backend", ""))]
+        if b_vals and s_vals:
+            speedup = np.mean(b_vals) / max(np.mean(s_vals), 1e-9)
+            ax2.bar(str(pl), speedup, color=PALETTE[1], edgecolor="black", linewidth=0.5)
+    ax2.axhline(1.0, color="gray", linestyle="--", alpha=0.5)
+    ax2.set_xlabel("Prompt Length (tokens)")
+    ax2.set_ylabel("Speedup vs. Baseline")
+    ax2.set_title("Speculative Decoding: Speedup")
+    fig.tight_layout()
+    save_fig(fig, f"{output_dir}/spec_decode_comparison")
+
+
 def plot_kv_quant_comparison(rows: list[dict[str, Any]], output_dir: str) -> None:
     """Plot KV-cache quantization speedup across context lengths."""
     apply_style()
@@ -285,6 +330,83 @@ def plot_kv_cache_size(output_dir: str) -> None:
     save_fig(fig, f"{output_dir}/kv_cache_size")
 
 
+def _load_bandwidth_csv(results_dir: str) -> list[dict[str, Any]]:
+    """Load device bandwidth for single-system bottleneck analysis."""
+    path = Path(results_dir) / "summary" / "device_bandwidth.csv"
+    if not path.exists():
+        return []
+    import csv
+    with open(path) as f:
+        return list(csv.DictReader(f))
+
+
+def _run_single_system_bottleneck_analysis(
+    rows: list[dict[str, Any]],
+    bandwidth_rows: list[dict[str, Any]],
+    results_dir: str,
+    fig_dir: str,
+) -> None:
+    """Run roofline, predictor, and regime map for single-system (Goal 4)."""
+    if not rows or not bandwidth_rows:
+        return
+
+    bw = bandwidth_rows[0]
+    bandwidth_gb_s = float(bw.get("bandwidth_gb_s", 0))
+    device = str(bw.get("device", "cpu")).lower()
+
+    if bandwidth_gb_s <= 0:
+        print("[Plots] Skipping bottleneck analysis: no valid bandwidth.")
+        return
+
+    # Peak compute (GFLOP/s) heuristic by device
+    peak_compute = 50.0 if device == "cpu" else (1000.0 if "cuda" in device else 100.0)
+
+    # Model weight bytes: tiny-gpt2 ~50M params * 2 bytes ≈ 100M; LLaMA-7B ~2B
+    model_weight_bytes = 250_000_000  # default for tiny-gpt2 / small models
+    model_ids = [r.get("model_id", "") for r in rows if r.get("model_id")]
+    for mid in model_ids:
+        mid_str = str(mid).lower()
+        if "llama" in mid_str and "7b" in mid_str:
+            model_weight_bytes = 7e9 * 2  # ~14B bytes fp16
+            break
+        if "llama" in mid_str and "13b" in mid_str:
+            model_weight_bytes = 13e9 * 2
+            break
+
+    from analysis.predictor_fit import build_features, fit_predictor, fit_and_save
+    from analysis.regime_map import build_regime_map, plot_regime_map
+    from analysis.roofline import roofline_analysis, plot_roofline
+
+    # Predictor + regime
+    try:
+        X, y = build_features(rows, bandwidth_gb_s, model_weight_bytes)
+        result = fit_predictor(X, y)
+        if result["n_samples"] >= 3:
+            fit_and_save(rows, bandwidth_gb_s, model_weight_bytes, results_dir, label="default")
+            regime_data = build_regime_map(rows, result["coefficients"], bandwidth_gb_s, model_weight_bytes)
+            if regime_data:
+                from bench.utils.io import write_csv
+                summary_dir = Path(results_dir) / "summary"
+                summary_dir.mkdir(parents=True, exist_ok=True)
+                write_csv(str(summary_dir / "regime_map_default.csv"), regime_data)
+                plot_regime_map(regime_data, title="Bottleneck Regime Map", output_stem=str(Path(fig_dir) / "regime_map"))
+        else:
+            print("[Plots] Skipping predictor/regime: insufficient samples.")
+    except Exception as e:
+        print(f"[Plots] Predictor/regime skip: {e}")
+
+    # Roofline
+    try:
+        components = roofline_analysis(
+            peak_compute_gflops=peak_compute,
+            peak_bandwidth_gb_s=bandwidth_gb_s,
+            seq_lengths=[128, 512, 1024],
+        )
+        plot_roofline(peak_compute, bandwidth_gb_s, components, output_stem=str(Path(fig_dir) / "roofline"))
+    except Exception as e:
+        print(f"[Plots] Roofline skip: {e}")
+
+
 def make_all_plots(results_dir: str = "results") -> None:
     """Generate all plots from available results."""
     fig_dir = str(Path(results_dir) / "figures")
@@ -299,6 +421,7 @@ def make_all_plots(results_dir: str = "results") -> None:
         plot_ttft_scaling(rows, fig_dir)
         plot_throughput(rows, fig_dir)
         plot_kv_quant_comparison(rows, fig_dir)
+        plot_spec_decode_comparison(rows, fig_dir)
         plot_token_trace(rows, fig_dir)
         print(f"[Plots] Inflection points found: {len(inflections)}")
     else:
@@ -306,6 +429,10 @@ def make_all_plots(results_dir: str = "results") -> None:
 
     # Always generate analytical plots
     plot_kv_cache_size(fig_dir)
+
+    # Single-system bottleneck analysis (Goal 4: roofline, predictor, regime)
+    bandwidth_rows = _load_bandwidth_csv(results_dir)
+    _run_single_system_bottleneck_analysis(rows, bandwidth_rows, results_dir, fig_dir)
 
     print(f"[Plots] All figures saved to {fig_dir}/")
 

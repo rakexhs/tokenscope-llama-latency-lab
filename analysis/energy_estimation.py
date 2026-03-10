@@ -51,9 +51,16 @@ def estimate_energy_per_token(
     sampled during execution. Otherwise, returns a placeholder.
     """
     if not nvidia_smi_available():
+        # If no NVIDIA GPU is present, energy estimation is not implemented.
+        # Users can still estimate energy manually using platform-specific tools
+        # such as `powermetrics` on macOS or `perf stat`/`powerstat` on Linux.
         return {
             "available": False,
-            "message": "nvidia-smi not found. Energy estimation requires NVIDIA GPU.",
+            "message": (
+                "nvidia-smi not found. Energy estimation is available only on NVIDIA GPUs. "
+                "For CPU/MPS devices, please measure energy using external tools (e.g. macOS "
+                "powermetrics or Linux powerstat)."
+            ),
         }
 
     power_samples: list[float] = []

@@ -25,5 +25,10 @@ base:
 
 sweep:
   hf.dtype:
+    # Precision sweep: test 32-bit, 16-bit, bfloat16, and auto (let
+    # transformers pick the optimal type based on device).  Note that fp16 and
+    # bf16 require a GPU or Apple Silicon device.
     - fp32
+    - fp16
+    - bf16
     - auto

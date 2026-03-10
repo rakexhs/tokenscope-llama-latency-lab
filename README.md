@@ -15,7 +15,7 @@ TokenScope is an end-to-end performance forensics lab for autoregressive LLM inf
 - **KV-Cache Quantization** — Implemented optimization comparing f16/q8_0/q4_0 KV precision with speedup analysis
 - **Auto-Generated Report** — Publication-quality figures and a structured findings report from the latest results
 - **Multi-System Support** — Every command tags results by system name so you can benchmark across machines and compare side-by-side
-- **Live Progress Feedback** — Warmups, trials, and token generation now display progress bars so large-model runs do not look stuck
+- **Live Progress Feedback** — Real-time progress bars for warmups, trials, and token generation enhance transparency and allow users to effectively monitor long-running tasks
 
 ---
 
@@ -150,7 +150,8 @@ Each full pipeline runs **every experiment type**:
 
 **test → benchmark → sequence sweep → model sweep → precision sweep → decompose → profiler → bandwidth → plots → report**
 
-`full-gpu` additionally runs: **KV-cache quantization sweep + energy estimation**.
+- `full-gpu` additionally runs: **KV-cache quantization sweep + energy estimation**.
+- `full-cpu` and `full-mps` include **KV-cache sweep** when `MODEL=/path/to/model.gguf` is provided.
 
 Your findings report will be at: `results/My_Machine/report/report_latest.md`
 
@@ -177,7 +178,9 @@ Add `MODEL=/path/to/model.gguf` to use a real model instead of tiny-gpt2.
 |---|---|
 | `make sweep-seq SYSTEM=X` | Sequence-length sweep (uses MODEL or tiny-gpt2) |
 | `make sweep-seq-gpu SYSTEM=X MODEL=/path/to.gguf` | Sequence-length sweep on GPU (MODEL required) |
-| `make sweep-models SYSTEM=X` | Model-size sweep |
+| `make sweep-models SYSTEM=X` | Model-size sweep (HF) |
+| `make sweep-models-gguf SYSTEM=X` | Model-size sweep (GGUF; edit config paths) |
+| `make sweep-spec SYSTEM=X` | Speculative decoding vs baseline (Bonus) |
 | `make sweep-precision SYSTEM=X` | Precision sweep (fp32 vs. fp16/bf16) |
 | `make sweep-kv SYSTEM=X MODEL=/path/to.gguf` | KV-cache quantization sweep (MODEL required) |
 

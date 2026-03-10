@@ -1,0 +1,33 @@
+# TokenScope — Speculative decoding vs baseline (Bonus)
+# Compares per-token latency: loop_decode (baseline) vs spec_decode.
+# Usage: python -m bench.sweep --config configs/sweep_spec_decode.yaml
+#
+# The target model should be larger than the draft. Here we use distilgpt2
+# as target and tiny-gpt2 as draft. For LLaMA, use a 7B target with 160M draft.
+
+base:
+  backend: hf
+  device: cpu
+  model:
+    id_or_path: distilgpt2
+  generation:
+    prompt_length: 64
+    output_length: 64
+    temperature: 0.0
+    seed: 42
+  benchmark:
+    warmup_runs: 2
+    trials: 5
+    iqr_filter: true
+    steady_state_skip: 2
+  hf:
+    mode: loop_decode
+    dtype: auto
+    spec:
+      draft_model_id: sshleifer/tiny-gpt2
+      draft_steps: 4
+
+sweep:
+  hf.mode:
+    - loop_decode
+    - spec_decode

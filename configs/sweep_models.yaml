@@ -26,3 +26,10 @@ sweep:
   model.id_or_path:
     - sshleifer/tiny-gpt2
     - distilgpt2
+    # LLaMA-style models for scaling analysis (paths/IDs should be replaced with
+    # valid model identifiers or local GGUF files).  These examples cover
+    # increasing parameter counts to observe latency scaling.  Uncomment
+    # and adjust as appropriate for your environment.
+    - meta-llama/llama-7b-hf
+    - meta-llama/llama-13b-hf
+    #- /path/to/llama-70b.gguf

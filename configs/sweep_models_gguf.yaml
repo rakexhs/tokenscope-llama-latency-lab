@@ -1,0 +1,35 @@
+# TokenScope — Model-size sweep (GGUF only, no HF access required)
+# Compare latency across different GGUF model sizes.
+# Usage: python -m bench.sweep --config configs/sweep_models_gguf.yaml --override model.id_or_path=/path/to/model.gguf
+#
+# Replace the placeholder paths with actual GGUF files. For model-size scaling,
+# use models of different parameter counts (e.g. 3B, 7B, 13B).
+
+base:
+  backend: llamacpp
+  device: cpu
+  model:
+    id_or_path: /path/to/llama-3b.gguf
+  generation:
+    prompt_length: 64
+    output_length: 32
+    temperature: 0.0
+    seed: 42
+  benchmark:
+    warmup_runs: 2
+    trials: 5
+    iqr_filter: true
+    steady_state_skip: 2
+  llamacpp:
+    n_threads: 0
+    n_gpu_layers: 0
+    kv_type_k: f16
+    kv_type_v: f16
+
+sweep:
+  model.id_or_path:
+    # Replace with your actual GGUF paths for model-size comparison.
+    # Example: 3B, 7B, 13B variants from TheBloke or similar.
+    - /path/to/llama-3b-q4_k_m.gguf
+    - /path/to/llama-7b-q4_k_m.gguf
+    - /path/to/llama-13b-q4_k_m.gguf

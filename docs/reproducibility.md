@@ -8,15 +8,31 @@ git clone <repo-url> && cd tokenscope-llama-latency-lab
 pip install -e ".[hf,dev]"
 
 # Run minimal benchmark
-python -m bench.run_bench \
+python3 -m bench.run_bench \
   --config configs/bench_default.yaml \
   --override backend=hf device=cpu \
   model.id_or_path=sshleifer/tiny-gpt2 \
   generation.output_length=32 generation.prompt_length=64
 
+# Try batched inference (batch_size=2)
+python3 -m bench.run_bench \
+  --config configs/bench_default.yaml \
+  --override backend=hf device=cpu \
+  model.id_or_path=sshleifer/tiny-gpt2 \
+  generation.output_length=32 generation.prompt_length=64 \
+  generation.batch_size=2
+
+# Evaluate speculative decoding (requires a draft model)
+python3 -m bench.run_bench \
+  --config configs/bench_default.yaml \
+  --override backend=hf device=cpu \
+  hf.mode=spec_decode \
+  hf.spec.draft_model_id=sshleifer/tiny-gpt2 \
+  hf.spec.draft_steps=4
+
 # Generate plots and report
-python -m analysis.make_plots --results_dir results
-python -m analysis.findings_report --results_dir results
+python3 -m analysis.make_plots --results_dir results
+python3 -m analysis.findings_report --results_dir results
 ```
 
 ## Full Reproduction Checklist
@@ -25,10 +41,10 @@ python -m analysis.findings_report --results_dir results
 
 ```bash
 # Python 3.10+ required
-python --version
+python3 --version
 
 # Create virtual environment
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 
 # Install all dependencies
@@ -38,7 +54,7 @@ pip install -e ".[all]"
 ### 2. Sequence Length Sweep
 
 ```bash
-python -m bench.sweep --config configs/sweep_sequence.yaml
+python3 -m bench.sweep --config configs/sweep_sequence.yaml
 ```
 
 Expected output: `results/summary/agg_latest.csv` with rows for each
@@ -47,13 +63,13 @@ prompt length (32, 64, 128, 256, 512).
 ### 3. Model Size Sweep
 
 ```bash
-python -m bench.sweep --config configs/sweep_models.yaml
+python3 -m bench.sweep --config configs/sweep_models.yaml
 ```
 
 ### 4. Latency Decomposition
 
 ```bash
-python -m profiling.decompose_decode \
+python3 -m profiling.decompose_decode \
   --model sshleifer/tiny-gpt2 --device cpu --n_tokens 16
 ```
 
@@ -64,19 +80,19 @@ Expected output: `results/summary/decomp_*.csv` and
 
 ```bash
 # All plots
-python -m analysis.make_plots --results_dir results
+python3 -m analysis.make_plots --results_dir results
 
 # Bandwidth micro-benchmark
-python -m analysis.bandwidth_microbench --device cpu
+python3 -m analysis.bandwidth_microbench --device cpu
 
 # Findings report
-python -m analysis.findings_report --results_dir results
+python3 -m analysis.findings_report --results_dir results
 ```
 
 ### 6. Tests
 
 ```bash
-python -m pytest tests/ -v
+python3 -m pytest tests/ -v
 ```
 
 ## With Real LLaMA Models
@@ -90,13 +106,13 @@ pip install llama-cpp-python
 # Download a GGUF model (example: LLaMA-2-7B Q4_K_M)
 # Place at /path/to/llama-2-7b-q4_k_m.gguf
 
-python -m bench.run_bench \
+python3 -m bench.run_bench \
   --config configs/bench_default.yaml \
   --override backend=llamacpp device=cpu \
   model.id_or_path=/path/to/llama-2-7b-q4_k_m.gguf
 
 # KV-cache quantization sweep
-python -m bench.sweep --config configs/sweep_kv_cache.yaml \
+python3 -m bench.sweep --config configs/sweep_kv_cache.yaml \
   --override model.id_or_path=/path/to/llama-2-7b-q4_k_m.gguf
 ```
 
@@ -105,7 +121,7 @@ python -m bench.sweep --config configs/sweep_kv_cache.yaml \
 ```bash
 pip install torch transformers accelerate
 
-python -m bench.run_bench \
+python3 -m bench.run_bench \
   --config configs/bench_default.yaml \
   --override backend=hf device=cuda \
   model.id_or_path=meta-llama/Llama-2-7b-hf
