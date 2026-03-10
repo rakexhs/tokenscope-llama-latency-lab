@@ -62,7 +62,11 @@ As S grows, the S² term dominates, and TTFT grows super-linearly.
 
 6. **Speculative decoding** (future work): Uses a small "draft" model to
    propose multiple tokens verified by the large model in one forward pass.
-   Reduces the number of large-model forward passes needed.
+   Reduces the number of large-model forward passes needed.  TokenScope
+   now includes an experimental speculative decoding mode (`hf.mode=spec_decode`).
+   Provide `hf.spec.draft_model_id` and `hf.spec.draft_steps` in the config to
+   enable this optimization.  If the draft model is omitted, the code
+   gracefully falls back to baseline decode.
 
 ## Memory Bandwidth: The Decode Bottleneck
 
