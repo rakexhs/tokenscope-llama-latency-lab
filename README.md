@@ -306,7 +306,7 @@ make plots SYSTEM=My_Machine
 make report SYSTEM=My_Machine
 ```
 
-### Recommended Cross-Platform + Forensics Setup (Project 6 Style)
+### Recommended Cross-Platform + Forensics Setup
 
 To fully reproduce the “Token-Generation Latency in LLaMA” project (CPU/Mac/WSL + GPU + KV-cache optimization + HF forensics), we recommend:
 
@@ -437,7 +437,7 @@ tokenscope-llama-latency-lab/
 └── .github/workflows/ci.yml
 ```
 
-## Rubric Coverage
+## Coverage
 
 | Goal | What | Command |
 |------|------|---------|
